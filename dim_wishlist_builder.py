@@ -8,7 +8,8 @@ DIM 中文推荐表转愿望单工具。
 - 武器列默认识别：名字 / 武器 / name / weapon
 - perk 列默认识别：列名包含 Perk / perk / PERK
 - 单元格多行 perk 自动展开组合
-- 同名多版本武器会全部生成
+- 同名多版本武器会全部生成，并分别读取各自 socket
+- perk 按“武器版本 + 动态 socket 映射 + 名称”解析，不做全局 hash 套用
 - 未匹配武器/perk 输出到 unresolved CSV
 """
 from __future__ import annotations
@@ -45,8 +46,8 @@ MANIFEST_PATH = r"./world_sql_content_22b6eb96bbcaa631746b584b52bcc2a6.content"
 # Excel 工作表名；CSV 无效。None 表示读取第一个 sheet。
 SHEET_NAME = None
 
-# 输出目录。建议单独放一个文件夹
-OUTPUT_DIR = r"./outputs"
+# 输出目录。建议单独放一个文件夹，避免覆盖旧结果。
+OUTPUT_DIR = r"./dim_wishlist_output"
 
 # 输出文件名。
 OUT_WISHLIST = "dim_wishlist_resolved.txt"
@@ -62,13 +63,17 @@ CACHE_DIR = "./.manifest_cache"
 # - "all": 同名查到多个武器 hash 时，全部写入，并按每个 item hash 独立分组输出。推荐默认。
 WEAPON_VERSION_MODE = "all"
 
+# 同名旧版本缺少部分推荐 perk 时的处理：
+# - "drop_unsupported": 该版本只保留实际支持的 perk，仍生成降级愿望单。推荐默认。
+# - "strict": 只要有一个推荐 perk 不支持，就跳过该版本。
+VERSION_PERK_POLICY = "drop_unsupported"
+
 # 武器 hash 手动覆盖。用于 manifest 查出多个同名候选时指定准确版本。
 # 写法示例：WEAPON_HASH_OVERRIDES = {"Yeartide Apex": [3293207827], "毫不迟疑": [123456789]}
 WEAPON_HASH_OVERRIDES: Dict[str, List[int]] = {}
 
 # 输出所有武器名匹配到的候选 hash，方便检查为什么组合数翻倍。
 OUT_WEAPON_CANDIDATES = "dim_wishlist_weapon_candidates.csv"
-OUT_PERK_CANDIDATES = "dim_wishlist_perk_candidates.csv"
 OUT_PERK_CANDIDATES = "dim_wishlist_perk_candidates.csv"
 
 
@@ -80,6 +85,15 @@ EXCLUDE_PERK_HEADERS = {"原始特性", "起源特性", "origin trait", "origin"
 
 # 常见中文全角/半角分隔符。换行最重要。
 SPLIT_RE = re.compile(r"[\n\r/／、，,;；|｜]+")
+
+# 输入表四个固定列在武器随机词条 socket 中的位置。
+# 0/1/2/3 分别对应 DIM 中写出的第1/2/3/4个 perk hash。
+SLOT_TO_ROLL_INDEX = {
+    "slot_1_barrel": 0,
+    "slot_2_magazine": 1,
+    "slot_3_trait": 2,
+    "slot_4_trait": 3,
+}
 
 
 def norm_name(s: Any) -> str:
@@ -246,12 +260,48 @@ def load_inventory_items(db_path: Path) -> List[InvItem]:
     return items
 
 
+
+def load_plug_sets(db_path: Path) -> Dict[int, List[int]]:
+    """读取 DestinyPlugSetDefinition，返回 plugSetHash -> plugItemHash 列表。
+
+    SQLite id 可能是 signed int32；字典键和 plug hash 统一转成 DIM 使用的 uint32。
+    """
+    con = sqlite3.connect(str(db_path))
+    cur = con.cursor()
+    tables = {r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "DestinyPlugSetDefinition" not in tables:
+        con.close()
+        raise RuntimeError("manifest 中没有 DestinyPlugSetDefinition，无法按武器 socket 解析 perk。")
+
+    out: Dict[int, List[int]] = {}
+    for raw_id, raw_json in cur.execute("SELECT id, json FROM DestinyPlugSetDefinition"):
+        try:
+            obj = json.loads(raw_json)
+        except Exception:
+            continue
+        set_hash = to_dim_hash(obj.get("hash", raw_id))
+        hashes: List[int] = []
+        for entry in obj.get("reusablePlugItems", []) or []:
+            h = entry.get("plugItemHash")
+            if h not in (None, 0):
+                hashes.append(to_dim_hash(h))
+        # 保序去重。
+        out[set_hash] = list(dict.fromkeys(hashes))
+    con.close()
+    return out
+
 class ManifestIndex:
-    def __init__(self, items: List[InvItem]):
+    def __init__(self, items: List[InvItem], plug_sets: Dict[int, List[int]]):
         self.items = items
+        self.plug_sets = plug_sets
         self.by_name: Dict[str, List[InvItem]] = {}
+        self.by_hash: Dict[int, InvItem] = {}
+        self._roll_socket_cache: Dict[int, List[Dict[str, Any]]] = {}
+        self._slot_socket_mapping_cache: Dict[Tuple[int, Tuple[Tuple[str, Tuple[str, ...]], ...]], Dict[str, Dict[str, Any]]] = {}
+        self._perk_resolution_cache: Dict[Tuple[int, str, str, Tuple[Tuple[str, Tuple[str, ...]], ...]], Tuple[Optional[InvItem], Dict[str, Any]]] = {}
         for it in items:
             self.by_name.setdefault(norm_name(it.name), []).append(it)
+            self.by_hash[it.hash] = it
 
     def find_weapons(self, name: str) -> List[InvItem]:
         key = norm_name(name)
@@ -259,36 +309,12 @@ class ManifestIndex:
         weapons = [x for x in exact if x.item_type == 3]
         if weapons:
             return sorted(weapons, key=lambda x: x.hash)
-        # 保守的模糊匹配：仅当归一化名互相包含，并且是武器。
-        fuzzy = [x for k, vals in self.by_name.items() if (key and (key in k or k in key)) for x in vals if x.item_type == 3]
+        fuzzy = [
+            x for k, vals in self.by_name.items()
+            if key and (key in k or k in key)
+            for x in vals if x.item_type == 3
+        ]
         return sorted(fuzzy, key=lambda x: (x.name, x.hash))
-
-    def find_perk_hashes(self, name: str) -> List[InvItem]:
-        """按 DIM wishlist 需要的 InventoryItem plug hash 解析 perk。
-
-        关键规则：
-        - 只接受精确同名；
-        - 优先 itemType == 19 且存在 plug；
-        - 普通“特性”优先；
-        - 排除“强化特征”、徽标等同名非目标条目。
-        """
-        key = norm_name(name)
-        exact = self.by_name.get(key, [])
-        if not exact:
-            return []
-
-        # DIM wishlist 的 perk 应使用 DestinyInventoryItemDefinition 里的 plug item hash。
-        plug_traits = [x for x in exact if x.item_type == 19 and x.has_plug]
-        if plug_traits:
-            return self._rank_perk_candidates(plug_traits)
-
-        # 极少数定义可能缺 plug 字段，仍限制 itemType==19。
-        type19 = [x for x in exact if x.item_type == 19]
-        if type19:
-            return self._rank_perk_candidates(type19)
-
-        # 不再回退到徽标、收藏品等同名非 perk 条目。
-        return []
 
     @staticmethod
     def _is_enhanced_perk(c: InvItem) -> bool:
@@ -302,18 +328,13 @@ class ManifestIndex:
 
     @staticmethod
     def _is_normal_trait(c: InvItem) -> bool:
-        # 中文 manifest：itemTypeDisplayName="特性", tierTypeName="普通"。
-        # 英文 manifest：itemTypeDisplayName 通常为 "Trait"。
-        t = c.item_type_display.lower()
-        tier = c.tier_type_name.lower()
         tt = c.item_type_and_tier_display.lower()
-        is_trait_name = (c.item_type_display in {"特性", "Trait"}) or (" trait" in tt) or tt.endswith("trait")
-        is_normal_tier = (c.tier_type_name in {"普通", "Common"}) or ("普通" in tt) or ("common" in tt)
+        is_trait_name = c.item_type_display in {"特性", "Trait"} or " trait" in tt or tt.endswith("trait")
+        is_normal_tier = c.tier_type_name in {"普通", "Common"} or "普通" in tt or "common" in tt
         return is_trait_name and is_normal_tier and not ManifestIndex._is_enhanced_perk(c)
 
     @staticmethod
     def _perk_rank(c: InvItem) -> Tuple[int, int, int, int, int]:
-        """候选排序：普通特性 > 非强化 plug > 强化 plug > 其他 itemType19 > 其他。"""
         if ManifestIndex._is_normal_trait(c):
             return (0, 0, 0, 0, c.hash)
         if c.item_type == 19 and c.has_plug and not ManifestIndex._is_enhanced_perk(c):
@@ -326,19 +347,283 @@ class ManifestIndex:
 
     @staticmethod
     def _rank_perk_candidates(cands: List[InvItem]) -> List[InvItem]:
-        """同名候选排序：普通特性 > 非强化 plug > 其他 itemType19 plug。"""
-        if not cands:
-            return []
-
         seen = set()
         out: List[InvItem] = []
         for c in sorted(cands, key=ManifestIndex._perk_rank):
-            if c.hash in seen:
-                continue
-            out.append(c)
-            seen.add(c.hash)
+            if c.hash not in seen:
+                out.append(c)
+                seen.add(c.hash)
         return out
 
+    def find_perk_hashes(self, name: str) -> List[InvItem]:
+        """仅用于候选报告；正式生成不再使用全局名称匹配。"""
+        exact = self.by_name.get(norm_name(name), [])
+        valid = [x for x in exact if x.item_type == 19 and x.has_plug]
+        return self._rank_perk_candidates(valid)
+
+    def _collect_socket_hashes(self, socket_entry: Dict[str, Any]) -> List[int]:
+        hashes: List[int] = []
+        for key in ("randomizedPlugSetHash", "reusablePlugSetHash"):
+            set_hash = socket_entry.get(key)
+            if set_hash not in (None, 0):
+                hashes.extend(self.plug_sets.get(to_dim_hash(set_hash), []))
+        for entry in socket_entry.get("reusablePlugItems", []) or []:
+            h = entry.get("plugItemHash")
+            if h not in (None, 0):
+                hashes.append(to_dim_hash(h))
+        return list(dict.fromkeys(hashes))
+
+    def get_weapon_roll_sockets(self, weapon_hash: int) -> List[Dict[str, Any]]:
+        """返回武器的四个随机 roll socket，顺序即 DIM perk 顺序。\n\n        首选 randomizedPlugSetHash。它专门指向该 socket 的随机词条集合。\n        极少数定义不足四个时，才用其他可复用 plug socket 补齐，并排除框架、起源特性、模组等。\n        """
+        weapon_hash = to_dim_hash(weapon_hash)
+        if weapon_hash in self._roll_socket_cache:
+            return self._roll_socket_cache[weapon_hash]
+
+        weapon = self.by_hash.get(weapon_hash)
+        if not weapon:
+            return []
+        entries = (weapon.json_obj.get("sockets") or {}).get("socketEntries", []) or []
+        randomized: List[Dict[str, Any]] = []
+        fallback: List[Dict[str, Any]] = []
+
+        for socket_index, entry in enumerate(entries):
+            candidate_hashes = self._collect_socket_hashes(entry)
+            candidates = [self.by_hash[h] for h in candidate_hashes if h in self.by_hash]
+            candidates = [c for c in candidates if c.item_type == 19 and c.has_plug]
+            if not candidates:
+                continue
+
+            categories = {c.plug_category_identifier.lower() for c in candidates if c.plug_category_identifier}
+            info = {
+                "socket_index": socket_index,
+                "socket_type_hash": to_dim_hash(entry.get("socketTypeHash", 0)),
+                "randomized_plug_set_hash": to_dim_hash(entry.get("randomizedPlugSetHash", 0)) if entry.get("randomizedPlugSetHash") else 0,
+                "reusable_plug_set_hash": to_dim_hash(entry.get("reusablePlugSetHash", 0)) if entry.get("reusablePlugSetHash") else 0,
+                "candidate_hashes": [c.hash for c in candidates],
+                "candidates": candidates,
+                "categories": sorted(categories),
+            }
+            if entry.get("randomizedPlugSetHash"):
+                randomized.append(info)
+                continue
+
+            joined = " ".join(categories)
+            excluded_tokens = (
+                "frame", "intrinsic", "origin", "masterwork", "tracker", "mod", "memento",
+                "shader", "cosmetic", "deepsight", "enhancement", "crafting_plug",
+            )
+            if not any(token in joined for token in excluded_tokens):
+                fallback.append(info)
+
+        # socketEntries 本身有固定顺序。通常前四个 randomized socket 就是1~4号位。
+        sockets = randomized[:4]
+        if len(sockets) < 4:
+            used = {x["socket_index"] for x in sockets}
+            for info in fallback:
+                if info["socket_index"] not in used:
+                    sockets.append(info)
+                    used.add(info["socket_index"])
+                if len(sockets) >= 4:
+                    break
+
+        self._roll_socket_cache[weapon_hash] = sockets
+        return sockets
+
+    @staticmethod
+    def _slot_category_bonus(slot: str, categories: Sequence[str]) -> int:
+        """根据 plugCategoryIdentifier 给槽位一个很小的辅助分数。
+
+        名称命中始终是主依据；分类只用于多个映射得分相同时的稳定选择。
+        """
+        text = " ".join(categories).lower()
+        if slot == "slot_1_barrel":
+            tokens = ("barrel", "sight", "scope", "bowstring", "string", "blade", "haft")
+        elif slot == "slot_2_magazine":
+            tokens = ("magazine", "battery", "arrow", "fletching", "guard", "projectile", "ammo")
+        else:
+            tokens = ("trait", "perk")
+        return 8 if any(token in text for token in tokens) else 0
+
+    @staticmethod
+    def _slot_options_signature(slot_options: Optional[Dict[str, Sequence[str]]]) -> Tuple[Tuple[str, Tuple[str, ...]], ...]:
+        slot_options = slot_options or {}
+        ordered: List[Tuple[str, Tuple[str, ...]]] = []
+        for slot in SLOT_TO_ROLL_INDEX:
+            vals = tuple(sorted({norm_name(x) for x in slot_options.get(slot, []) if norm_name(x)}))
+            if vals:
+                ordered.append((slot, vals))
+        return tuple(ordered)
+
+    def infer_slot_socket_mapping(
+        self,
+        weapon_hash: int,
+        slot_options: Optional[Dict[str, Sequence[str]]],
+    ) -> Dict[str, Dict[str, Any]]:
+        """根据本行全部推荐 perk，推断四个输入列对应的真实武器 socket。
+
+        不再假设 manifest 的前四个随机 socket 永远严格对应输入四列。算法会：
+        1. 统计每个输入列的推荐名称在各 socket 候选中的命中数量；
+        2. 对最多四个 socket 做一对一排列；
+        3. 优先选择名称命中最多的映射；
+        4. 命中相同后，才使用类别与原始顺序作为稳定的次级依据。
+        """
+        weapon_hash = to_dim_hash(weapon_hash)
+        signature = self._slot_options_signature(slot_options)
+        cache_key = (weapon_hash, signature)
+        if cache_key in self._slot_socket_mapping_cache:
+            return self._slot_socket_mapping_cache[cache_key]
+
+        sockets = self.get_weapon_roll_sockets(weapon_hash)
+        slots = [slot for slot, vals in signature if vals]
+        if not slots:
+            slots = list(SLOT_TO_ROLL_INDEX)
+        slots = slots[:len(sockets)]
+
+        result: Dict[str, Dict[str, Any]] = {}
+        if not sockets or not slots:
+            self._slot_socket_mapping_cache[cache_key] = result
+            return result
+
+        option_map = {slot: set(vals) for slot, vals in signature}
+        socket_name_sets = [
+            {norm_name(c.name) for c in socket.get("candidates", []) if norm_name(c.name)}
+            for socket in sockets
+        ]
+
+        best_perm: Optional[Tuple[int, ...]] = None
+        best_objective: Optional[Tuple[int, int, int, int]] = None
+        best_slot_scores: Dict[str, Dict[str, int]] = {}
+
+        for perm in itertools.permutations(range(len(sockets)), len(slots)):
+            total_hits = 0
+            slots_with_hits = 0
+            category_bonus = 0
+            order_penalty = 0
+            local_scores: Dict[str, Dict[str, int]] = {}
+            for slot, roll_index in zip(slots, perm):
+                opts = option_map.get(slot, set())
+                hits = len(opts & socket_name_sets[roll_index])
+                if hits > 0:
+                    slots_with_hits += 1
+                total_hits += hits
+                cat_bonus = self._slot_category_bonus(slot, sockets[roll_index].get("categories", []))
+                category_bonus += cat_bonus
+                order_penalty += abs(SLOT_TO_ROLL_INDEX.get(slot, roll_index) - roll_index)
+                local_scores[slot] = {
+                    "name_hits": hits,
+                    "category_bonus": cat_bonus,
+                    "order_distance": abs(SLOT_TO_ROLL_INDEX.get(slot, roll_index) - roll_index),
+                }
+
+            # 名称命中优先级远高于类别和原顺序。
+            objective = (total_hits, slots_with_hits, category_bonus, -order_penalty)
+            if best_objective is None or objective > best_objective:
+                best_objective = objective
+                best_perm = perm
+                best_slot_scores = local_scores
+
+        if best_perm is None:
+            self._slot_socket_mapping_cache[cache_key] = result
+            return result
+
+        for slot, roll_index in zip(slots, best_perm):
+            socket = sockets[roll_index]
+            score = best_slot_scores.get(slot, {})
+            result[slot] = {
+                "roll_index": roll_index,
+                "socket_index": socket.get("socket_index", ""),
+                "name_hits": score.get("name_hits", 0),
+                "category_bonus": score.get("category_bonus", 0),
+                "order_distance": score.get("order_distance", 0),
+                "mapping_method": "name_coverage_assignment" if score.get("name_hits", 0) > 0 else "ordered_fallback",
+            }
+
+        self._slot_socket_mapping_cache[cache_key] = result
+        return result
+
+    def resolve_perk_for_weapon_slot(
+        self,
+        weapon_hash: int,
+        slot: str,
+        perk_name: str,
+        slot_options: Optional[Dict[str, Sequence[str]]] = None,
+    ) -> Tuple[Optional[InvItem], Dict[str, Any]]:
+        """在指定武器版本中，先推断输入列对应 socket，再解析 perk。"""
+        signature = self._slot_options_signature(slot_options)
+        cache_key = (to_dim_hash(weapon_hash), slot, norm_name(perk_name), signature)
+        if cache_key in self._perk_resolution_cache:
+            return self._perk_resolution_cache[cache_key]
+
+        sockets = self.get_weapon_roll_sockets(weapon_hash)
+        mapping = self.infer_slot_socket_mapping(weapon_hash, slot_options)
+        mapped = mapping.get(slot)
+        detail: Dict[str, Any] = {
+            "weapon_hash": to_dim_hash(weapon_hash),
+            "slot": slot,
+            "roll_index": "",
+            "socket_index": "",
+            "candidate_hashes": [],
+            "candidate_names": [],
+            "same_name_hashes": [],
+            "mapping_method": "",
+            "mapping_name_hits": 0,
+            "reason": "",
+        }
+        if mapped is None:
+            default_roll_index = SLOT_TO_ROLL_INDEX.get(slot)
+            if default_roll_index is None:
+                detail["reason"] = "unknown_input_slot"
+                result = (None, detail)
+                self._perk_resolution_cache[cache_key] = result
+                return result
+            if default_roll_index >= len(sockets):
+                detail["reason"] = f"weapon_has_only_{len(sockets)}_roll_sockets"
+                result = (None, detail)
+                self._perk_resolution_cache[cache_key] = result
+                return result
+            mapped = {
+                "roll_index": default_roll_index,
+                "socket_index": sockets[default_roll_index].get("socket_index", ""),
+                "mapping_method": "ordered_fallback",
+                "name_hits": 0,
+            }
+
+        roll_index = int(mapped["roll_index"])
+        if roll_index >= len(sockets):
+            detail["reason"] = f"mapped_roll_index_out_of_range_{roll_index}"
+            result = (None, detail)
+            self._perk_resolution_cache[cache_key] = result
+            return result
+
+        socket = sockets[roll_index]
+        candidates: List[InvItem] = socket["candidates"]
+        detail["roll_index"] = roll_index
+        detail["socket_index"] = socket["socket_index"]
+        detail["candidate_hashes"] = [c.hash for c in candidates]
+        detail["candidate_names"] = [c.name for c in candidates]
+        detail["plug_categories"] = socket.get("categories", [])
+        detail["mapping_method"] = mapped.get("mapping_method", "")
+        detail["mapping_name_hits"] = mapped.get("name_hits", 0)
+
+        key = norm_name(perk_name)
+        exact = [c for c in candidates if norm_name(c.name) == key]
+        detail["same_name_hashes"] = [c.hash for c in exact]
+        if not exact:
+            detail["reason"] = "perk_not_in_mapped_weapon_socket"
+            result = (None, detail)
+            self._perk_resolution_cache[cache_key] = result
+            return result
+
+        ranked = self._rank_perk_candidates(exact)
+        selected = ranked[0] if ranked else None
+        if not selected:
+            detail["reason"] = "same_name_candidates_filtered_out"
+        else:
+            detail["reason"] = "resolved_from_mapped_weapon_socket"
+            detail["selected_hash"] = selected.hash
+        result = (selected, detail)
+        self._perk_resolution_cache[cache_key] = result
+        return result
 
 def read_table(input_path: Path, sheet: Optional[str] = None) -> Tuple[List[str], List[Dict[str, Any]]]:
     suffix = input_path.suffix.lower()
@@ -535,45 +820,6 @@ def describe_inv_item(c: InvItem) -> str:
     return f"{c.hash}:{c.name}:{c.item_type_display}:{c.tier_type_name}"
 
 
-def write_perk_candidate_report(path: Path, index: ManifestIndex, expanded: List[Dict[str, Any]]) -> None:
-    """输出每个请求 perk 的所有精确同名候选，方便检查是否误选强化/徽标。"""
-    seen = set()
-    rows: List[Dict[str, Any]] = []
-    for rec in expanded:
-        weapon = rec.get("weapon", "")
-        row_id = rec.get("source_row", "")
-        perk_slots = rec.get("perk_slots", {}) or {}
-        slot_order = rec.get("slot_order", []) or []
-        for slot in slot_order:
-            perk = perk_slots.get(slot, "")
-            key = (weapon, slot, perk)
-            if not perk or key in seen:
-                continue
-            seen.add(key)
-            exact = index.by_name.get(norm_name(perk), [])
-            selected = index.find_perk_hashes(perk)
-            rows.append({
-                "source_row": row_id,
-                "weapon": weapon,
-                "slot": slot,
-                "perk": perk,
-                "selected_hash": selected[0].hash if selected else "",
-                "selected_sqlite_id": selected[0].sql_id if selected else "",
-                "selected_name": selected[0].name if selected else "",
-                "selected_type_display": selected[0].item_type_display if selected else "",
-                "selected_tier": selected[0].tier_type_name if selected else "",
-                "candidate_count": len(exact),
-                "candidate_hashes": ";".join(str(c.hash) for c in exact),
-                "candidate_sqlite_ids": ";".join(str(c.sql_id) for c in exact),
-                "candidate_types": ";".join(f"{c.item_type_display}/{c.tier_type_name}/itemType={c.item_type}/plug={c.has_plug}" for c in exact),
-                "candidate_names": ";".join(c.name for c in exact),
-            })
-    csv_write(path, rows, [
-        "source_row", "weapon", "slot", "perk",
-        "selected_hash", "selected_sqlite_id", "selected_name", "selected_type_display", "selected_tier",
-        "candidate_count", "candidate_hashes", "candidate_sqlite_ids", "candidate_types", "candidate_names",
-    ])
-
 def build_group_header(weapon: str, notes: str) -> List[str]:
     """生成接近 Little Light / DIM 官方工具的分组注释样式。"""
     header = [f"// {sanitize_comment(weapon)} - recommended"]
@@ -672,204 +918,314 @@ def write_weapon_candidate_report(path: Path, index: ManifestIndex, expanded: Li
 
 
 def write_perk_candidate_report(path: Path, index: ManifestIndex, expanded: List[Dict[str, Any]]) -> None:
-    """输出每个 perk 名称的候选与最终选择，专门排查同名/强化/徽标误匹配。"""
-    seen = []
-    seen_key = set()
+    """按武器版本和固定槽位输出 perk 解析候选。"""
+    rows: List[Dict[str, Any]] = []
+    seen = set()
     for rec in expanded:
-        for slot, perk in (rec.get("perk_slots", {}) or {}).items():
-            k = (slot, norm_name(perk))
-            if perk and k not in seen_key:
-                seen.append((slot, perk))
-                seen_key.add(k)
-
-    rows = []
-    for slot, perk in seen:
-        exact = index.by_name.get(norm_name(perk), [])
-        selected = index.find_perk_hashes(perk)
-        selected_hash = selected[0].hash if selected else ""
-        for c in sorted(exact, key=lambda x: ManifestIndex._perk_rank(x) if x.item_type == 19 else (9, 9, 9, 9, x.hash)):
-            rows.append({
-                "slot": slot,
-                "requested_perk": perk,
-                "selected": "yes" if c.hash == selected_hash else "no",
-                "hash": c.hash,
-                "sqlite_id": c.sql_id,
-                "manifest_name": c.name,
-                "item_type": c.item_type,
-                "item_type_display": c.item_type_display,
-                "item_type_and_tier_display": c.item_type_and_tier_display,
-                "tier_type_name": c.tier_type_name,
-                "has_plug": c.has_plug,
-                "plug_category_identifier": c.plug_category_identifier,
-                "candidate_count_same_name": len(exact),
-                "selected_hash": selected_hash,
-            })
-        if not exact:
-            rows.append({
-                "slot": slot,
-                "requested_perk": perk,
-                "selected": "no",
-                "hash": "",
-                "sqlite_id": "",
-                "manifest_name": "",
-                "item_type": "",
-                "item_type_display": "",
-                "item_type_and_tier_display": "",
-                "tier_type_name": "",
-                "has_plug": "",
-                "plug_category_identifier": "",
-                "candidate_count_same_name": 0,
-                "selected_hash": "",
-            })
-
+        weapon = rec.get("weapon", "")
+        source_row = rec.get("source_row", "")
+        weapon_candidates = select_weapon_candidates(weapon, index.find_weapons(weapon))
+        perk_slots = rec.get("perk_slots", {}) or {}
+        for wc in weapon_candidates:
+            for slot, perk in perk_slots.items():
+                key = (wc.hash, slot, norm_name(perk))
+                if not perk or key in seen:
+                    continue
+                seen.add(key)
+                selected, detail = index.resolve_perk_for_weapon_slot(
+                    wc.hash, slot, perk, rec.get("parsed_perk_columns", {})
+                )
+                rows.append({
+                    "source_row": source_row,
+                    "weapon": weapon,
+                    "weapon_hash": wc.hash,
+                    "weapon_sqlite_id": wc.sql_id,
+                    "slot": slot,
+                    "roll_index": detail.get("roll_index", ""),
+                    "socket_index": detail.get("socket_index", ""),
+                    "requested_perk": perk,
+                    "selected_hash": selected.hash if selected else "",
+                    "selected_sqlite_id": selected.sql_id if selected else "",
+                    "selected_name": selected.name if selected else "",
+                    "selected_type": selected.item_type_display if selected else "",
+                    "reason": detail.get("reason", ""),
+                    "mapping_method": detail.get("mapping_method", ""),
+                    "mapping_name_hits": detail.get("mapping_name_hits", 0),
+                    "socket_candidate_count": len(detail.get("candidate_hashes", [])),
+                    "socket_candidate_hashes": ";".join(str(x) for x in detail.get("candidate_hashes", [])),
+                    "socket_candidate_names": ";".join(detail.get("candidate_names", [])),
+                    "same_name_hashes_in_socket": ";".join(str(x) for x in detail.get("same_name_hashes", [])),
+                    "plug_categories": ";".join(detail.get("plug_categories", [])),
+                })
     csv_write(path, rows, [
-        "slot", "requested_perk", "selected", "hash", "sqlite_id", "manifest_name",
-        "item_type", "item_type_display", "item_type_and_tier_display", "tier_type_name",
-        "has_plug", "plug_category_identifier", "candidate_count_same_name", "selected_hash",
+        "source_row", "weapon", "weapon_hash", "weapon_sqlite_id", "slot", "roll_index", "socket_index",
+        "requested_perk", "selected_hash", "selected_sqlite_id", "selected_name", "selected_type", "reason",
+        "mapping_method", "mapping_name_hits", "socket_candidate_count", "socket_candidate_hashes", "socket_candidate_names",
+        "same_name_hashes_in_socket", "plug_categories",
     ])
 
-def build_wishlist(index: ManifestIndex, expanded: List[Dict[str, Any]]) -> Tuple[List[str], List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """生成 DIM wishlist。
+def collapse_expanded_recommendations(expanded: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """把笛卡尔积展开结果还原成每个原始推荐行一条记录。
 
-    关键点：
-    - perk 组合按固定槽位展开：slot_1 × slot_2 × slot_3 × slot_4。
-    - 如果同名武器匹配到多个 item hash，每个 item hash 作为一个独立分组输出。
-      例如 2 个版本、每个版本 36 个组合，应输出两个分组，各 36 条；
-      不应在同一个分组里 2965... / 3293... 交替出现。
+    版本兼容性必须基于某一行的全部可选 perk 计算，不能逐组合处理；
+    否则一个旧版本缺少一个 perk 时，会把整组其他兼容组合也一起丢掉。
     """
+    unique: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
+    for rec in expanded:
+        parsed = rec.get("parsed_perk_columns", {}) or {}
+        parsed_sig = tuple(
+            (slot, tuple(parsed.get(slot, []) or []))
+            for slot in rec.get("slot_order", []) or []
+        )
+        key = (
+            rec.get("source_row"), rec.get("weapon"), rec.get("notes"), parsed_sig,
+        )
+        if key not in unique:
+            unique[key] = {
+                "source_row": rec.get("source_row"),
+                "weapon": rec.get("weapon", ""),
+                "notes": rec.get("notes", ""),
+                "slot_order": list(rec.get("slot_order", []) or []),
+                "parsed_perk_columns": {
+                    slot: list(parsed.get(slot, []) or [])
+                    for slot in rec.get("slot_order", []) or []
+                },
+            }
+    return list(unique.values())
+
+
+def build_wishlist(index: ManifestIndex, expanded: List[Dict[str, Any]]) -> Tuple[List[str], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """按武器版本生成愿望单，并对旧版本执行 perk 降级。
+
+    full 版本：该推荐行中的所有 perk 都能在该版本对应 socket 中找到，输出完整笛卡尔积。
+    partial 版本：只保留该版本实际支持的 perk；不支持的 perk 写入 unresolved，但不阻止
+    其他兼容 perk 组合生成。若某个槽位没有任何兼容 perk，则该槽位从 DIM 规则中省略。
+    DIM 官方格式允许 `perks` 包含一个或多个 hash。
+    """
+    policy = str(VERSION_PERK_POLICY).strip().lower()
+    if policy not in {"drop_unsupported", "strict"}:
+        raise RuntimeError(
+            f"未知 VERSION_PERK_POLICY: {VERSION_PERK_POLICY!r}，"
+            "只能是 'drop_unsupported' 或 'strict'"
+        )
+
     lines = [
         "title:Converted Chinese Weapon Wishlist",
-        "description:Generated by dim_wishlist_builder.py from a Chinese recommendation table.",
+        "description:Generated with weapon-specific dynamic socket mapping and version fallback.",
         "",
     ]
     unresolved: List[Dict[str, Any]] = []
     resolved_audit: List[Dict[str, Any]] = []
+    groups: Dict[Tuple[int, str, str, int, str, str], List[str]] = {}
+    seen_lines_by_group: Dict[Tuple[int, str, str, int, str, str], set] = {}
 
-    # groups 保持插入顺序：先按原始表行，再按武器候选 hash 分组。
-    # key = (source_row, weapon, notes, weapon_hash, manifest_name)
-    groups: Dict[Tuple[int, str, str, int, str], List[str]] = {}
-    seen_lines_by_group: Dict[Tuple[int, str, str, int, str], set] = {}
+    source_recommendations = collapse_expanded_recommendations(expanded)
 
-    for rec in expanded:
+    for rec in source_recommendations:
         row_id = rec["source_row"]
         weapon = rec["weapon"]
-        perks = rec["perks"]
         notes = rec.get("notes", "")
+        slot_order = rec.get("slot_order", []) or []
+        slot_options = rec.get("parsed_perk_columns", {}) or {}
 
         all_weapon_candidates = index.find_weapons(weapon)
         weapon_candidates = select_weapon_candidates(weapon, all_weapon_candidates)
         if not all_weapon_candidates:
             unresolved.append({
-                "source_row": row_id,
-                "type": "weapon",
-                "name": weapon,
-                "reason": "weapon_not_found",
-                "perks": " / ".join(perks),
+                "source_row": row_id, "type": "weapon", "name": weapon,
+                "reason": "weapon_not_found", "weapon": weapon,
+                "generated": "no", "version_status": "skipped",
+                "perks": " / ".join(
+                    p for slot in slot_order for p in slot_options.get(slot, [])
+                ),
             })
             continue
         if not weapon_candidates:
             unresolved.append({
-                "source_row": row_id,
-                "type": "weapon",
-                "name": weapon,
-                "reason": "weapon_override_or_selection_empty",
-                "perks": " / ".join(perks),
+                "source_row": row_id, "type": "weapon", "name": weapon,
+                "reason": "weapon_override_or_selection_empty", "weapon": weapon,
+                "generated": "no", "version_status": "skipped",
+                "perks": " / ".join(
+                    p for slot in slot_order for p in slot_options.get(slot, [])
+                ),
             })
             continue
 
-        perk_hashes: List[int] = []
-        selected_perk_types: List[str] = []
-        selected_perk_sqlite_ids: List[int] = []
-        bad = False
-        for perk in perks:
-            cands = index.find_perk_hashes(perk)
-            if not cands:
-                same_name = index.by_name.get(norm_name(perk), [])
+        for wc in weapon_candidates:
+            supported_by_slot: Dict[str, List[InvItem]] = {}
+            details_by_slot_name: Dict[Tuple[str, str], Dict[str, Any]] = {}
+            dropped: List[Tuple[str, str, Dict[str, Any]]] = []
+            requested_count = 0
+
+            # 同一个显示名称可能在 manifest 中有多个 hash，因此必须针对当前版本、当前 socket 逐项解析。
+            for slot in slot_order:
+                selected_items: List[InvItem] = []
+                seen_hashes = set()
+                for perk_name in slot_options.get(slot, []) or []:
+                    requested_count += 1
+                    selected, detail = index.resolve_perk_for_weapon_slot(
+                        wc.hash, slot, perk_name, slot_options
+                    )
+                    details_by_slot_name[(slot, perk_name)] = detail
+                    if selected is None:
+                        dropped.append((slot, perk_name, detail))
+                        continue
+                    if selected.hash not in seen_hashes:
+                        selected_items.append(selected)
+                        seen_hashes.add(selected.hash)
+                supported_by_slot[slot] = selected_items
+
+            supported_count = sum(len(v) for v in supported_by_slot.values())
+            version_status = "full" if not dropped else "partial"
+
+            if policy == "strict" and dropped:
+                for slot, perk_name, detail in dropped:
+                    unresolved.append({
+                        "source_row": row_id,
+                        "type": "perk",
+                        "name": perk_name,
+                        "reason": detail.get("reason", "perk_not_in_mapped_weapon_socket"),
+                        "weapon": weapon,
+                        "weapon_hash": wc.hash,
+                        "slot": slot,
+                        "socket_index": detail.get("socket_index", ""),
+                        "mapping_method": detail.get("mapping_method", ""),
+                        "mapping_name_hits": detail.get("mapping_name_hits", 0),
+                        "generated": "no",
+                        "version_status": "skipped_strict",
+                        "requested_option_count": requested_count,
+                        "supported_option_count": supported_count,
+                        "perks": " / ".join(
+                            p for s in slot_order for p in slot_options.get(s, [])
+                        ),
+                        "same_name_candidate_hashes": ";".join(str(x) for x in detail.get("same_name_hashes", [])),
+                        "same_name_candidate_types": "",
+                        "socket_candidate_hashes": ";".join(str(x) for x in detail.get("candidate_hashes", [])),
+                        "socket_candidate_names": ";".join(detail.get("candidate_names", [])),
+                    })
+                continue
+
+            # 记录被旧版本舍弃的 perk，但 generated=yes 表示该版本仍生成了兼容子集。
+            for slot, perk_name, detail in dropped:
                 unresolved.append({
                     "source_row": row_id,
                     "type": "perk",
-                    "name": perk,
-                    "reason": "perk_not_found_or_no_valid_inventory_plug",
+                    "name": perk_name,
+                    "reason": "perk_dropped_for_incompatible_version",
+                    "original_reason": detail.get("reason", "perk_not_in_mapped_weapon_socket"),
                     "weapon": weapon,
-                    "perks": " / ".join(perks),
-                    "same_name_candidate_hashes": ";".join(str(x.hash) for x in same_name),
-                    "same_name_candidate_types": ";".join(f"{x.hash}:{x.item_type_display}/{x.item_type_and_tier_display}" for x in same_name),
+                    "weapon_hash": wc.hash,
+                    "slot": slot,
+                    "socket_index": detail.get("socket_index", ""),
+                    "mapping_method": detail.get("mapping_method", ""),
+                    "mapping_name_hits": detail.get("mapping_name_hits", 0),
+                    "generated": "yes",
+                    "version_status": version_status,
+                    "requested_option_count": requested_count,
+                    "supported_option_count": supported_count,
+                    "perks": " / ".join(
+                        p for s in slot_order for p in slot_options.get(s, [])
+                    ),
+                    "same_name_candidate_hashes": ";".join(str(x) for x in detail.get("same_name_hashes", [])),
+                    "same_name_candidate_types": "",
+                    "socket_candidate_hashes": ";".join(str(x) for x in detail.get("candidate_hashes", [])),
+                    "socket_candidate_names": ";".join(detail.get("candidate_names", [])),
                 })
-                bad = True
-                break
-            # 普通版优先后只取第一个，避免同一 perk 生成过多重复规则。
-            perk_hashes.append(cands[0].hash)
-        if bad:
-            continue
 
-        perk_slots = rec.get("perk_slots", {}) or {}
-        slot_order = rec.get("slot_order", []) or []
-        slot_hashes = {slot: perk_hashes[i] if i < len(perk_hashes) else "" for i, slot in enumerate(slot_order)}
-        slot_sqlite_ids = {slot: selected_perk_sqlite_ids[i] if i < len(selected_perk_sqlite_ids) else "" for i, slot in enumerate(slot_order)}
-        slot_types = {slot: selected_perk_types[i] if i < len(selected_perk_types) else "" for i, slot in enumerate(slot_order)}
-        perk_part = ",".join(str(x) for x in perk_hashes)
-
-        for wc in weapon_candidates:
-            group_key = (
-                int(row_id),
-                sanitize_comment(weapon),
-                sanitize_comment(notes),
-                int(wc.hash),
-                sanitize_comment(wc.name),
-            )
-            if group_key not in groups:
-                groups[group_key] = []
-                seen_lines_by_group[group_key] = set()
-
-            line = f"dimwishlist:item={wc.hash}&perks={perk_part}"
-            if line in seen_lines_by_group[group_key]:
+            active_slots = [slot for slot in slot_order if supported_by_slot.get(slot)]
+            if not active_slots:
+                unresolved.append({
+                    "source_row": row_id,
+                    "type": "version",
+                    "name": weapon,
+                    "reason": "version_has_no_compatible_recommended_perks",
+                    "weapon": weapon,
+                    "weapon_hash": wc.hash,
+                    "generated": "no",
+                    "version_status": "skipped",
+                    "requested_option_count": requested_count,
+                    "supported_option_count": 0,
+                    "perks": " / ".join(
+                        p for s in slot_order for p in slot_options.get(s, [])
+                    ),
+                })
                 continue
-            groups[group_key].append(line)
-            seen_lines_by_group[group_key].add(line)
-            resolved_audit.append({
-                "source_row": row_id,
-                "weapon": weapon,
-                "weapon_hash": wc.hash,
-                "weapon_sqlite_id": wc.sql_id,
-                "manifest_name": wc.name,
-                "slot_1_barrel": perk_slots.get("slot_1_barrel", ""),
-                "slot_1_hash": slot_hashes.get("slot_1_barrel", ""),
-                "slot_1_sqlite_id": slot_sqlite_ids.get("slot_1_barrel", ""),
-                "slot_1_type": slot_types.get("slot_1_barrel", ""),
-                "slot_2_magazine": perk_slots.get("slot_2_magazine", ""),
-                "slot_2_hash": slot_hashes.get("slot_2_magazine", ""),
-                "slot_2_sqlite_id": slot_sqlite_ids.get("slot_2_magazine", ""),
-                "slot_2_type": slot_types.get("slot_2_magazine", ""),
-                "slot_3_trait": perk_slots.get("slot_3_trait", ""),
-                "slot_3_hash": slot_hashes.get("slot_3_trait", ""),
-                "slot_3_sqlite_id": slot_sqlite_ids.get("slot_3_trait", ""),
-                "slot_3_type": slot_types.get("slot_3_trait", ""),
-                "slot_4_trait": perk_slots.get("slot_4_trait", ""),
-                "slot_4_hash": slot_hashes.get("slot_4_trait", ""),
-                "slot_4_sqlite_id": slot_sqlite_ids.get("slot_4_trait", ""),
-                "slot_4_type": slot_types.get("slot_4_trait", ""),
-                "dim_line": line,
-            })
 
-    wrote_any_group = False
+            dropped_names = [perk for _slot, perk, _detail in dropped]
+            combo_lists = [supported_by_slot[slot] for slot in active_slots]
+            group_key = (
+                int(row_id), sanitize_comment(weapon), sanitize_comment(notes),
+                int(wc.hash), sanitize_comment(wc.name), version_status,
+            )
+            groups.setdefault(group_key, [])
+            seen_lines_by_group.setdefault(group_key, set())
+
+            for combo in itertools.product(*combo_lists):
+                selected_by_slot = {slot: item for slot, item in zip(active_slots, combo)}
+                perk_hashes = [selected_by_slot[slot].hash for slot in active_slots]
+                if not perk_hashes:
+                    continue
+                perk_part = ",".join(str(x) for x in perk_hashes)
+                line = f"dimwishlist:item={wc.hash}&perks={perk_part}"
+                if line in seen_lines_by_group[group_key]:
+                    continue
+                groups[group_key].append(line)
+                seen_lines_by_group[group_key].add(line)
+
+                audit: Dict[str, Any] = {
+                    "source_row": row_id,
+                    "weapon": weapon,
+                    "weapon_hash": wc.hash,
+                    "weapon_sqlite_id": wc.sql_id,
+                    "manifest_name": wc.name,
+                    "version_status": version_status,
+                    "included_slots": ";".join(active_slots),
+                    "dropped_perks": ";".join(dropped_names),
+                    "requested_option_count": requested_count,
+                    "supported_option_count": supported_count,
+                    "dim_line": line,
+                }
+                for slot in SLOT_TO_ROLL_INDEX:
+                    requested = slot_options.get(slot, []) or []
+                    supported = supported_by_slot.get(slot, []) or []
+                    selected = selected_by_slot.get(slot)
+                    selected_detail = (
+                        details_by_slot_name.get((slot, selected.name), {}) if selected else {}
+                    )
+                    audit[f"{slot}_requested_options"] = ";".join(requested)
+                    audit[f"{slot}_supported_options"] = ";".join(x.name for x in supported)
+                    audit[slot] = selected.name if selected else ""
+                    audit[f"{slot}_hash"] = selected.hash if selected else ""
+                    audit[f"{slot}_sqlite_id"] = selected.sql_id if selected else ""
+                    audit[f"{slot}_type"] = selected.item_type_display if selected else ""
+                    audit[f"{slot}_socket_index"] = selected_detail.get("socket_index", "")
+                resolved_audit.append(audit)
+
+    wrote_any = False
     for group_key, group_lines in groups.items():
         if not group_lines:
             continue
-        _row_id, weapon_name, notes, weapon_hash, manifest_name = group_key
-        if wrote_any_group:
+        _row_id, weapon_name, notes, weapon_hash, manifest_name, version_status = group_key
+        if wrote_any:
             lines.append("")
-
-        # 多版本时必须分组。标题里加 hash，方便肉眼检查不同版本没有混在一起。
         header_weapon = weapon_name
         if manifest_name and norm_name(manifest_name) != norm_name(weapon_name):
             header_weapon = f"{weapon_name} / {manifest_name}"
-        header_weapon = f"{header_weapon} [{weapon_hash}]"
-        lines.extend(build_group_header(header_weapon, notes))
+        if version_status == "partial":
+            header_weapon = f"{header_weapon} [兼容子集]"
+        lines.extend(build_group_header(f"{header_weapon} [{weapon_hash}]", notes))
         lines.extend(group_lines)
-        wrote_any_group = True
+        wrote_any = True
 
-    return lines, unresolved, resolved_audit
+    unique_unresolved: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
+    for row in unresolved:
+        key = (
+            row.get("source_row"), row.get("type"), row.get("weapon"), row.get("weapon_hash"),
+            row.get("slot"), row.get("name"), row.get("reason"), row.get("socket_index"),
+        )
+        unique_unresolved.setdefault(key, row)
 
+    return lines, list(unique_unresolved.values()), resolved_audit
 
 def main() -> int:
     input_path = Path(INPUT_PATH).expanduser().resolve()
@@ -883,7 +1239,6 @@ def main() -> int:
     resolved_audit_path = output_dir / OUT_RESOLVED_AUDIT
     weapon_candidates_path = output_dir / OUT_WEAPON_CANDIDATES
     perk_candidates_path = output_dir / OUT_PERK_CANDIDATES
-    perk_candidates_path = output_dir / OUT_PERK_CANDIDATES
     cache_dir = Path(CACHE_DIR).expanduser().resolve()
 
     print("[CONFIG]")
@@ -891,6 +1246,7 @@ def main() -> int:
     print(f"      manifest: {manifest_path}")
     print(f"      output_dir: {output_dir}")
     print(f"      weapon_version_mode: {WEAPON_VERSION_MODE}")
+    print(f"      version_perk_policy: {VERSION_PERK_POLICY}")
     print("")
 
     print(f"[1/5] 准备 manifest: {manifest_path}")
@@ -899,8 +1255,10 @@ def main() -> int:
 
     print("[2/5] 读取 DestinyInventoryItemDefinition ...")
     items = load_inventory_items(sqlite_path)
-    index = ManifestIndex(items)
+    plug_sets = load_plug_sets(sqlite_path)
+    index = ManifestIndex(items, plug_sets)
     print(f"      已读取 {len(items)} 个 InventoryItem")
+    print(f"      已读取 {len(plug_sets)} 个 PlugSet")
 
     print(f"[3/5] 读取推荐表: {input_path}")
     headers, rows = read_table(input_path, sheet=SHEET_NAME)
@@ -921,15 +1279,23 @@ def main() -> int:
     lines, unresolved, resolved_audit = build_wishlist(index, expanded)
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     csv_write(unresolved_path, unresolved, [
-        "source_row", "type", "name", "reason", "weapon", "perks",
+        "source_row", "type", "name", "reason", "original_reason", "weapon", "weapon_hash", "slot", "socket_index",
+        "mapping_method", "mapping_name_hits", "generated", "version_status",
+        "requested_option_count", "supported_option_count", "perks",
         "same_name_candidate_hashes", "same_name_candidate_types",
+        "socket_candidate_hashes", "socket_candidate_names",
     ])
     csv_write(resolved_audit_path, resolved_audit, [
-        "source_row", "weapon", "weapon_hash", "weapon_sqlite_id",
-        "slot_1_barrel", "slot_1_hash", "slot_1_sqlite_id", "slot_1_type",
-        "slot_2_magazine", "slot_2_hash", "slot_2_sqlite_id", "slot_2_type",
-        "slot_3_trait", "slot_3_hash", "slot_3_sqlite_id", "slot_3_type",
-        "slot_4_trait", "slot_4_hash", "slot_4_sqlite_id", "slot_4_type",
+        "source_row", "weapon", "weapon_hash", "weapon_sqlite_id", "manifest_name",
+        "version_status", "included_slots", "dropped_perks", "requested_option_count", "supported_option_count",
+        "slot_1_barrel_requested_options", "slot_1_barrel_supported_options",
+        "slot_1_barrel", "slot_1_barrel_hash", "slot_1_barrel_sqlite_id", "slot_1_barrel_type", "slot_1_barrel_socket_index",
+        "slot_2_magazine_requested_options", "slot_2_magazine_supported_options",
+        "slot_2_magazine", "slot_2_magazine_hash", "slot_2_magazine_sqlite_id", "slot_2_magazine_type", "slot_2_magazine_socket_index",
+        "slot_3_trait_requested_options", "slot_3_trait_supported_options",
+        "slot_3_trait", "slot_3_trait_hash", "slot_3_trait_sqlite_id", "slot_3_trait_type", "slot_3_trait_socket_index",
+        "slot_4_trait_requested_options", "slot_4_trait_supported_options",
+        "slot_4_trait", "slot_4_trait_hash", "slot_4_trait_sqlite_id", "slot_4_trait_type", "slot_4_trait_socket_index",
         "dim_line",
     ])
 
@@ -942,7 +1308,6 @@ def main() -> int:
     print(f"      extracted: {extracted_path}")
     print(f"      resolved audit: {resolved_audit_path}")
     print(f"      weapon candidates: {weapon_candidates_path}")
-    print(f"      perk candidates: {perk_candidates_path}")
     print(f"      perk candidates: {perk_candidates_path}")
     return 0
 
