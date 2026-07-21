@@ -18,13 +18,13 @@ def png_bytes(image):
 
 class IconWorkflowTests(unittest.TestCase):
     def test_sample_workbook_drawing_extraction(self):
-        workbook = Path(__file__).parents[1] / "examples" / "d2.xlsx"
+        workbook = Path(__file__).parents[1] / "input" / "d2.xlsx"
         with tempfile.TemporaryDirectory() as directory:
             contexts, stats = extract_icon_contexts(
                 workbook, Path(directory), IconBuilderConfig()
             )
-        self.assertEqual(stats["drawing_count"], 4115)
-        self.assertEqual(stats["perk_icon_position_count"], 3216)
+        self.assertEqual(stats["drawing_count"], 4120)
+        self.assertEqual(stats["perk_icon_position_count"], 3221)
         self.assertEqual(stats["unique_perk_icon_count"], 184)
         self.assertEqual(stats["missing_weapon_count"], 0)
         self.assertEqual(contexts[0].source_cell, "X6")

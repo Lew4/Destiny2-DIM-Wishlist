@@ -9,8 +9,8 @@ from typing import Dict, List
 
 @dataclass(frozen=True)
 class IconBuilderConfig:
-    input_xlsx: Path = Path("./examples/d2.xlsx")
-    manifest_path: Path = Path("./world_sql_content_22b6eb96bbcaa631746b584b52bcc2a6.content")
+    input_xlsx: Path = Path("./input/d2.xlsx")
+    manifest_path: Path = Path("./input/world_sql_content_22b6eb96bbcaa631746b584b52bcc2a6.content")
     output_dir: Path = Path("./outputs")
     cache_dir: Path = Path("./.manifest_cache")
     run_mode: str = "full"

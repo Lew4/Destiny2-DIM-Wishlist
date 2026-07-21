@@ -11,8 +11,8 @@ from typing import Dict, List, Optional
 class BuilderConfig:
     """All inputs and generation policies for one builder run."""
 
-    input_path: Path = Path("./命运2-凯旋丰碑全种类武器推荐-Sheet1.csv")
-    manifest_path: Path = Path("./world_sql_content_22b6eb96bbcaa631746b584b52bcc2a6.content")
+    input_path: Path = Path("./input/命运2-凯旋丰碑全种类武器推荐-Sheet1.csv")
+    manifest_path: Path = Path("./input/world_sql_content_22b6eb96bbcaa631746b584b52bcc2a6.content")
     output_dir: Path = Path("./outputs")
     sheet_name: Optional[str] = None
     cache_dir: Path = Path("./.manifest_cache")

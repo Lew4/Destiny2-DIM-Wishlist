@@ -26,9 +26,10 @@ dim_wishlist/
   config.py/icon_config.py    两种工作流配置
   models.py/icon_models.py    数据模型
   utils.py                    共享工具
-examples/
-  sample_recommendations.csv  文字表示例
-  d2.xlsx                     图标型XLSX验证样例
+input/
+  命运2-...推荐-Sheet1.csv     文字推荐表
+  d2.xlsx                     图标型XLSX
+  world_sql_content_*.content 本地Manifest（不提交）
 tests/                        单元和提取回归测试
 outputs/                      两种模式的统一输出目录
 ```
@@ -41,7 +42,7 @@ outputs/                      两种模式的统一输出目录
 python3 -m pip install -r requirements.txt
 ```
 
-依赖包括 `openpyxl`、`Pillow` 和 `numpy`。从 Bungie 下载对应语言的 `world_sql_content_*.content` 放在项目根目录。Manifest 通常有数百 MB，已被 `.gitignore` 排除。
+依赖包括 `openpyxl`、`Pillow` 和 `numpy`。从 Bungie 下载对应语言的 `world_sql_content_*.content` 放在 `input/`。Manifest 通常有数百 MB，已被 `.gitignore` 排除。
 
 ## 统一命令
 
@@ -68,8 +69,8 @@ python3 dim_wishlist_builder.py
 
 ```bash
 python3 dim_wishlist_builder.py text \
-  --input 命运2-凯旋丰碑全种类武器推荐-Sheet1.csv \
-  --manifest world_sql_content_xxx.content \
+  --input input/命运2-凯旋丰碑全种类武器推荐-Sheet1.csv \
+  --manifest input/world_sql_content_xxx.content \
   --output-dir outputs
 ```
 
@@ -94,7 +95,7 @@ python3 dim_wishlist_builder.py text \
 
 ```bash
 python3 dim_wishlist_builder.py icon \
-  --input examples/d2.xlsx \
+  --input input/d2.xlsx \
   --output-dir outputs \
   --run-mode extract_only
 ```
@@ -103,8 +104,8 @@ python3 dim_wishlist_builder.py icon \
 
 ```bash
 python3 dim_wishlist_builder.py icon \
-  --input examples/d2.xlsx \
-  --manifest world_sql_content_xxx.content \
+  --input input/d2.xlsx \
+  --manifest input/world_sql_content_xxx.content \
   --output-dir outputs \
   --run-mode full
 ```
@@ -146,4 +147,4 @@ python3 dim_wishlist_builder.py icon \
 python3 -m unittest discover -s tests -v
 ```
 
-测试覆盖文字表解析、signed/unsigned hash、旧版本兼容降级、真实样例XLSX的drawing提取，以及图标缩放和平移容忍。完整真实Manifest回归应保持：4115个drawing、3216个perk图标位置、184个唯一perk图标和6105条图标Wishlist规则。
+测试覆盖文字表解析、signed/unsigned hash、旧版本兼容降级、真实样例XLSX的drawing提取，以及图标缩放和平移容忍。当前完整真实Manifest回归基线为：4120个drawing、3221个perk图标位置、184个唯一perk图标和6240条图标Wishlist规则。
