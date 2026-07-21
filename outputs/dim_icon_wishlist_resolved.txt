@@ -1,5 +1,5 @@
 title:Icon-based DIM Wishlist
-description:Global icon recognition followed by weapon-version socket hash resolution.
+description:Weapon Wishlist from xiaoheihe @YXCRALLXY (https://api.xiaoheihe.cn/v3/bbs/app/api/web/share?h_camp=link&h_src=YXBwX3NoYXJl&link_id=4302720a6879).
 
 // 魔鬼中的天使 [153979397] (pve) [兼容子集]
 //notes: tags:pve；基本可以看作无条件触发的增伤
