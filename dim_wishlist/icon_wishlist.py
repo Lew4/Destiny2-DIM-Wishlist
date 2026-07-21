@@ -261,26 +261,40 @@ def render_wishlist_from_audit(audit: Sequence[Dict[str, Any]]) -> List[str]:
                 entry["notes"].append(value)
         entry["partials"].append(row.get("partial") == "yes")
 
+    grouped: Dict[Tuple[str, str, int, str], List[Dict[str, Any]]] = {}
+    for entry in unique.values():
+        primary_usage = entry["usages"][0]
+        group_key = (
+            entry["weapon_name"], entry["manifest_weapon_name"],
+            entry["weapon_hash"], primary_usage,
+        )
+        grouped.setdefault(group_key, []).append(entry)
+
     lines = [
         "title:Icon-based DIM Wishlist",
-        "description:Global icon recognition followed by weapon-version socket hash resolution.",
+        (
+            "description:Weapon Wishlist from xiaoheihe @YXCRALLXY "
+            "(https://api.xiaoheihe.cn/v3/bbs/app/api/web/share?"
+            "h_camp=link&h_src=YXBwX3NoYXJl&link_id=4302720a6879)."
+        ),
         "",
     ]
-    for entry in unique.values():
-        display_name = entry["weapon_name"]
-        if norm_name(entry["manifest_weapon_name"]) != norm_name(display_name):
-            display_name = f"{display_name} → {entry['manifest_weapon_name']}"
-        usage_label = "/".join(entry["usages"])
-        suffix = " [兼容子集]" if all(entry["partials"]) else ""
+    for (weapon_name, manifest_weapon_name, weapon_hash, usage), entries in grouped.items():
+        display_name = weapon_name
+        if norm_name(manifest_weapon_name) != norm_name(display_name):
+            display_name = f"{display_name} → {manifest_weapon_name}"
+        suffix = " [兼容子集]" if all(
+            all(entry["partials"]) for entry in entries
+        ) else ""
         lines.append(
-            f"// {sanitize_comment(display_name)} [{entry['weapon_hash']}] "
-            f"({usage_label}){suffix}"
+            f"// {sanitize_comment(display_name)} [{weapon_hash}] ({usage}){suffix}"
         )
-        note_parts = [f"tags:{','.join(entry['usages'])}"] + entry["notes"]
-        lines.append(f"//notes: {'；'.join(note_parts)}")
-        lines.append(
-            f"dimwishlist:item={entry['weapon_hash']}&perks={entry['wishlist_perks']}"
-        )
+        for entry in entries:
+            note_parts = [f"tags:{','.join(entry['usages'])}"] + entry["notes"]
+            lines.append(f"//notes: {'；'.join(note_parts)}")
+            lines.append(
+                f"dimwishlist:item={entry['weapon_hash']}&perks={entry['wishlist_perks']}"
+            )
         lines.append("")
     return lines
 

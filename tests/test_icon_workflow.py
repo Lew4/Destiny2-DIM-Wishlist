@@ -113,6 +113,20 @@ class IconWorkflowTests(unittest.TestCase):
         self.assertIn("PVE说明；PVP说明", note_line)
         self.assertNotIn("|", note_line)
 
+    def test_multiple_rolls_share_one_weapon_heading(self):
+        base = {
+            "weapon_hash": 901, "weapon_name": "测试枪",
+            "manifest_weapon_name": "测试枪", "usage": "pve",
+            "partial": "no", "_notes": [],
+        }
+        lines = render_wishlist_from_audit([
+            {**base, "wishlist_perks": "1001,1002"},
+            {**base, "wishlist_perks": "1001,1003"},
+        ])
+        headings = [line for line in lines if line.startswith("// 测试枪")]
+        self.assertEqual(headings, ["// 测试枪 [901] (pve)"])
+        self.assertEqual(sum(line.startswith("dimwishlist:") for line in lines), 2)
+
     def test_similarity_tolerates_small_translation(self):
         config = IconBuilderConfig()
         source = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
