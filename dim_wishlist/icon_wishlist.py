@@ -135,6 +135,38 @@ def resolve_global_visual_in_socket(
     return matched[0], "resolved_by_global_visual_and_socket", matched
 
 
+def resolve_named_perk_in_weapon_socket(
+    index: ManifestIndex,
+    weapon_hash: int,
+    perk_name: str,
+) -> Tuple[Optional[InventoryItem], Optional[Dict[str, Any]], List[InventoryItem]]:
+    """Resolve an exceptional named perk in its real weapon socket."""
+    weapon = index.by_hash.get(to_dim_hash(weapon_hash))
+    if weapon is None:
+        return None, None, []
+    entries = (weapon.json_obj.get("sockets") or {}).get("socketEntries", []) or []
+    for socket_index, entry in enumerate(entries):
+        hashes = list(index._collect_socket_hashes(entry))
+        initial_hash = entry.get("singleInitialItemHash")
+        if initial_hash not in (None, 0):
+            hashes.append(to_dim_hash(initial_hash))
+        candidates = [
+            index.by_hash[item_hash]
+            for item_hash in dict.fromkeys(hashes)
+            if item_hash in index.by_hash
+        ]
+        matched = ManifestIndex._rank_perk_candidates([
+            item for item in candidates if norm_name(item.name) == norm_name(perk_name)
+        ])
+        if matched:
+            return matched[0], {
+                "socket_index": socket_index,
+                "socket_type_hash": to_dim_hash(entry.get("socketTypeHash", 0)),
+                "candidates": candidates,
+            }, matched
+    return None, None, []
+
+
 def group_contexts(
     contexts: Sequence[IconContext],
 ) -> Dict[Tuple[int, int, str, str], List[IconContext]]:
@@ -188,10 +220,20 @@ def build_matches_and_wishlist(
 
         for weapon in weapons:
             sockets = strict_trait_sockets(index, weapon.hash)
+            trait_group = [
+                context for context in group
+                if config.icon_slot_overrides.get(context.icon_sha256, context.slot)
+                in {"trait_3", "trait_4"}
+            ]
             slot_sockets, mapping_info = assign_trait_sockets(
-                group, sockets, resolutions, item_visual_map
+                trait_group, sockets, resolutions, item_visual_map
             )
-            if not slot_sockets:
+            has_non_trait_override = any(
+                config.icon_slot_overrides.get(context.icon_sha256, context.slot)
+                not in {"trait_3", "trait_4"}
+                for context in group
+            )
+            if not slot_sockets and not has_non_trait_override:
                 for context in group:
                     global_result = resolutions.get(context.icon_sha256)
                     visual = visual_by_id.get(global_result.best_visual_id) if global_result else None
@@ -212,14 +254,26 @@ def build_matches_and_wishlist(
                 continue
 
             selected_by_slot: Dict[str, List[InventoryItem]] = {
-                "trait_3": [], "trait_4": [],
+                "slot_2": [], "trait_3": [], "trait_4": [],
             }
             group_match_rows = []
             for context in group:
                 global_result = resolutions.get(context.icon_sha256)
                 visual = visual_by_id.get(global_result.best_visual_id) if global_result else None
-                socket = slot_sockets.get(context.slot)
-                if global_result is None:
+                effective_slot = config.icon_slot_overrides.get(
+                    context.icon_sha256, context.slot
+                )
+                override_name = config.icon_name_overrides.get(context.icon_sha256, "")
+                socket = slot_sockets.get(effective_slot)
+                if override_name and effective_slot not in {"trait_3", "trait_4"}:
+                    selected, socket, socket_matches = resolve_named_perk_in_weapon_socket(
+                        index, weapon.hash, override_name
+                    )
+                    reason = (
+                        "resolved_by_name_override_and_weapon_socket"
+                        if selected else "override_perk_not_supported_by_weapon"
+                    )
+                elif global_result is None:
                     selected, reason, socket_matches = None, "global_resolution_missing", []
                 elif not global_result.accepted:
                     selected, reason, socket_matches = None, global_result.reason, []
@@ -230,16 +284,17 @@ def build_matches_and_wishlist(
                         global_result, socket, item_visual_map
                     )
                 if selected is not None and all(
-                    item.hash != selected.hash for item in selected_by_slot[context.slot]
+                    item.hash != selected.hash for item in selected_by_slot[effective_slot]
                 ):
-                    selected_by_slot[context.slot].append(selected)
+                    selected_by_slot[effective_slot].append(selected)
                 row = {
                     "excel_row": excel_row,
                     "weapon_name": weapon_name,
                     "weapon_type": context.weapon_type,
                     "weapon_hash": weapon.hash,
                     "usage": usage,
-                    "slot": context.slot,
+                    "source_slot": context.slot,
+                    "slot": effective_slot,
                     "slot_position": context.slot_position,
                     "source_cell": context.source_cell,
                     "icon_sha256": context.icon_sha256,
@@ -281,7 +336,7 @@ def build_matches_and_wishlist(
 
             nonempty = [
                 selected_by_slot[slot]
-                for slot in ("trait_3", "trait_4")
+                for slot in ("slot_2", "trait_3", "trait_4")
                 if selected_by_slot[slot]
             ]
             if not nonempty:
@@ -309,6 +364,8 @@ def build_matches_and_wishlist(
                     "weapon_name": weapon_name,
                     "weapon_hash": weapon.hash,
                     "usage": usage,
+                    "slot_2_names": " / ".join(item.name for item in selected_by_slot["slot_2"]),
+                    "slot_2_hashes": " / ".join(str(item.hash) for item in selected_by_slot["slot_2"]),
                     "trait_3_names": " / ".join(item.name for item in selected_by_slot["trait_3"]),
                     "trait_3_hashes": " / ".join(str(item.hash) for item in selected_by_slot["trait_3"]),
                     "trait_4_names": " / ".join(item.name for item in selected_by_slot["trait_4"]),

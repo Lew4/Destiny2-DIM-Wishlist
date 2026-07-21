@@ -14,7 +14,7 @@ from .utils import csv_write, norm_name
 
 
 MATCH_FIELDS = [
-    "excel_row", "weapon_name", "weapon_type", "weapon_hash", "usage", "slot",
+    "excel_row", "weapon_name", "weapon_type", "weapon_hash", "usage", "source_slot", "slot",
     "slot_position", "source_cell", "icon_sha256", "exported_icon", "socket_index",
     "mapping_method", "mapping_hits", "accepted", "reason", "recognized_names",
     "global_visual_id", "global_score", "global_margin", "global_match_method",
@@ -164,8 +164,9 @@ def write_final_reports(
     csv_write(output_dir / config.matches_filename, matches, MATCH_FIELDS)
     csv_write(output_dir / config.unresolved_filename, unresolved, MATCH_FIELDS + ["generated"])
     csv_write(output_dir / config.audit_filename, audit, [
-        "excel_row", "weapon_name", "weapon_hash", "usage", "trait_3_names",
-        "trait_3_hashes", "trait_4_names", "trait_4_hashes", "wishlist_perks",
+        "excel_row", "weapon_name", "weapon_hash", "usage", "slot_2_names",
+        "slot_2_hashes", "trait_3_names", "trait_3_hashes", "trait_4_names",
+        "trait_4_hashes", "wishlist_perks",
         "combination_count", "partial", "mapping_method", "mapping_hits",
     ])
     (output_dir / config.wishlist_filename).write_text(

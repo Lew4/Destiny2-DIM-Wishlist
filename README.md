@@ -123,6 +123,8 @@ python3 dim_wishlist_builder.py icon \
 1. 每个唯一Excel图标只在全局官方普通特性图标库中识别一次。
 2. 对每个武器版本，只在严格的普通 trait socket 中选择该视觉对应的实际 hash。
 
+少数工作簿会把非trait perk图标放在trait展示区域。此类图标使用按内容SHA-256记录的“名称 + 语义槽位”覆盖，仍必须通过具体武器socket校验。例如维卡拉微冲4的 `AG226` 实际是二号位“超频散热器”；工具会在socket 2选择普通版hash，而不会误当成三号特性或选择强化版。
+
 官方图标首次运行会从 Bungie 下载并缓存在 `outputs/.official_icon_cache/`。匹配依次利用原文件SHA-256、透明边缘裁切后的规范像素、透明轮廓SSIM/IoU、灰度结构、边缘余弦、dHash以及±2像素平移搜索。默认阈值为相似度 `0.935`、不同perk名称候选间距 `0.025`。
 
 图标模式输出：
@@ -147,4 +149,4 @@ python3 dim_wishlist_builder.py icon \
 python3 -m unittest discover -s tests -v
 ```
 
-测试覆盖文字表解析、signed/unsigned hash、旧版本兼容降级、真实样例XLSX的drawing提取，以及图标缩放和平移容忍。当前完整真实Manifest回归基线为：4120个drawing、3221个perk图标位置、184个唯一perk图标和6240条图标Wishlist规则。
+测试覆盖文字表解析、signed/unsigned hash、旧版本兼容降级、真实样例XLSX的drawing提取、图标平移容忍和特殊二号位普通/强化perk选择。当前完整真实Manifest回归基线为：4120个drawing、3221个perk图标位置、184/184个唯一perk图标识别成功，以及6240条图标Wishlist规则。

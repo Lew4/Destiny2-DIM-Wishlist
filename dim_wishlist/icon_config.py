@@ -16,7 +16,12 @@ class IconBuilderConfig:
     run_mode: str = "full"
     weapon_version_mode: str = "all"
     weapon_hash_overrides: Dict[str, List[int]] = field(default_factory=dict)
-    icon_name_overrides: Dict[str, str] = field(default_factory=dict)
+    icon_name_overrides: Dict[str, str] = field(default_factory=lambda: {
+        "5c78d6484ded3f3092ca0fbd4e3fb410cc904e4710103cd795b97d769c9ef668": "超频散热器",
+    })
+    icon_slot_overrides: Dict[str, str] = field(default_factory=lambda: {
+        "5c78d6484ded3f3092ca0fbd4e3fb410cc904e4710103cd795b97d769c9ef668": "slot_2",
+    })
 
     official_icon_cache_dir: Path = Path("./.official_icon_cache")
     bungie_icon_base: str = "https://www.bungie.net"

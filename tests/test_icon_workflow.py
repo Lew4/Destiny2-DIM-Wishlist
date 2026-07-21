@@ -7,7 +7,10 @@ from PIL import Image, ImageDraw
 
 from dim_wishlist.icon_config import IconBuilderConfig
 from dim_wishlist.icon_matching import image_similarity, signature_from_bytes
+from dim_wishlist.icon_wishlist import resolve_named_perk_in_weapon_socket
 from dim_wishlist.icon_xlsx import extract_icon_contexts
+from dim_wishlist.manifest import ManifestIndex
+from dim_wishlist.models import InventoryItem
 
 
 def png_bytes(image):
@@ -41,6 +44,45 @@ class IconWorkflowTests(unittest.TestCase):
             config,
         )
         self.assertGreater(score, 0.99)
+
+    def test_special_slot_override_prefers_normal_perk(self):
+        def item(item_hash, display, tier):
+            return InventoryItem(
+                hash=item_hash,
+                sql_id=item_hash,
+                name="超频散热器",
+                item_type=19,
+                item_type_display=display,
+                item_type_and_tier_display=f"{tier} {display}",
+                tier_type_name=tier,
+                plug_category_identifier="batteries",
+                has_plug=True,
+                json_obj={"hash": item_hash},
+            )
+
+        normal = item(1092016998, "电池", "普通")
+        enhanced = item(226831738, "强化电池", "罕见")
+        weapon = InventoryItem(
+            hash=1229624538,
+            sql_id=1229624538,
+            name="维卡拉微冲4",
+            item_type=3,
+            item_type_display="武器",
+            item_type_and_tier_display="传说武器",
+            tier_type_name="传说",
+            plug_category_identifier="",
+            has_plug=False,
+            json_obj={"sockets": {"socketEntries": [
+                {}, {}, {"randomizedPlugSetHash": 9001},
+            ]}},
+        )
+        index = ManifestIndex([weapon, normal, enhanced], {9001: [enhanced.hash, normal.hash]})
+        selected, socket, matched = resolve_named_perk_in_weapon_socket(
+            index, weapon.hash, "超频散热器"
+        )
+        self.assertEqual(selected.hash, normal.hash)
+        self.assertEqual(socket["socket_index"], 2)
+        self.assertEqual({candidate.hash for candidate in matched}, {normal.hash, enhanced.hash})
 
 
 if __name__ == "__main__":

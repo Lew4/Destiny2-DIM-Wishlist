@@ -246,8 +246,10 @@ def build_official_visual_catalog(
     config: IconBuilderConfig,
 ) -> Tuple[List[OfficialVisual], Dict[int, str], List[Dict[str, Any]]]:
     by_icon_path: Dict[str, List[InventoryItem]] = defaultdict(list)
+    override_names = {norm_name(name) for name in config.icon_name_overrides.values()}
     for item in index.items:
-        if is_normal_weapon_trait(item) and item_icon_path(item):
+        is_explicit_override = norm_name(item.name) in override_names
+        if (is_normal_weapon_trait(item) or is_explicit_override) and item_icon_path(item):
             by_icon_path[item_icon_path(item)].append(item)
 
     grouped: Dict[str, Dict[str, Any]] = {}

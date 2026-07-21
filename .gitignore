@@ -15,3 +15,4 @@ outputs/.official_icon_cache/
 # macOS metadata is not part of the project.
 .DS_Store
 ._*
+.~*
