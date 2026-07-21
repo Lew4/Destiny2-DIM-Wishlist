@@ -1,129 +1,116 @@
-# DIM 中文推荐表转愿望单工具
+# Destiny 2 DIM 中文愿望单生成器
 
-用途：把中文武器推荐表转换成 Destiny Item Manager 可导入的 wish list 文本。
+把中文武器推荐表转换成 [Destiny Item Manager](https://app.destinyitemmanager.com/) 可导入的 Wishlist。工具会使用本地 Bungie Manifest，在具体武器版本的具体 socket 内解析 perk，避免同名 perk 或历史武器版本使用错误 hash。
 
-输入：
+## 项目结构
 
-1. 中文推荐表：`.xlsx` 或 `.csv`
-2. Bungie manifest 数据库文件：你下载的 `world_sql_content_xxx.content`
+```text
+dim_wishlist_builder.py       兼容入口，仍可直接运行
+dim_wishlist/
+  cli.py                      命令行和完整流程编排
+  config.py                   默认配置、生成策略和公共常量
+  manifest.py                 Manifest 读取、socket 推断和 perk 解析
+  table.py                    CSV/XLSX 读取、列识别和组合展开
+  wishlist.py                 武器版本处理及 DIM 规则生成
+  reports.py                  审计和候选报告
+  models.py                   数据模型
+  utils.py                    文本、hash、文件和 CSV 工具
+tests/                        不依赖真实 Manifest 的单元测试
+examples/                     示例推荐表
+outputs/                      默认输出目录
+```
 
-输出：
+## 安装
 
-- `dim_wishlist_resolved.txt`：DIM 可导入愿望单
-- `dim_wishlist_unresolved.csv`：没有匹配成功的武器 / perk
-- `dim_wishlist_extracted.csv`：从原始推荐表识别并展开后的内容，用来检查是否漏读、错拆分
-
-## 1. 安装依赖
+需要 Python 3.9 或更高版本。CSV 输入只使用标准库；读取 XLSX 需要 `openpyxl`：
 
 ```bash
-cd dim_wishlist_builder
 python3 -m pip install -r requirements.txt
 ```
 
-## 2. 准备 Bungie manifest
+从 Bungie 下载对应语言的 `world_sql_content_*.content`，放到项目根目录。Manifest 通常有数百 MB，已被 `.gitignore` 排除，不会提交到仓库。
 
-你已经下载的文件类似：
+## 运行
 
-```text
-world_sql_content_22b6eb96bbcaa631746b584b52bcc2a6.content
+仓库中的文件名已经设为默认值，直接运行即可：
+
+```bash
+python3 dim_wishlist_builder.py
 ```
 
-可以直接传给脚本。脚本会自动判断它是压缩包还是 SQLite 数据库；如果是压缩包，会自动解压。
-
-## 3. 运行
+也可以显式指定路径和策略：
 
 ```bash
 python3 dim_wishlist_builder.py \
-  --input /path/to/命运2-凯旋丰碑全种类武器推荐.xlsx \
-  --manifest /path/to/world_sql_content_xxx.content \
-  --out dim_wishlist_resolved.txt \
-  --unresolved dim_wishlist_unresolved.csv \
-  --extracted dim_wishlist_extracted.csv
+  --input examples/sample_recommendations.csv \
+  --manifest /path/to/world_sql_content.content \
+  --output-dir outputs \
+  --weapon-version-mode all \
+  --version-perk-policy drop_unsupported
 ```
 
-## 4. 输入表格要求
+查看完整参数：
 
-推荐使用以下列名：
+```bash
+python3 dim_wishlist_builder.py --help
+```
+
+也支持包入口：
+
+```bash
+python3 -m dim_wishlist
+```
+
+## 输入格式
+
+支持 `.csv`、`.xlsx` 和 `.xlsm`。武器列默认识别 `名字`、`武器`、`name` 等名称；所有列名包含 `Perk` 的列会作为词条列。重复的 `Perk` 表头会被保留，多行或以 `/`、`、`、`,` 等分隔的 perk 会自动展开为组合。
+
+仓库原始表按武器类型分段，每段重复表头。解析器会识别第一段真实表头并跳过后续重复表头。
+
+四个 perk 列依次对应：
+
+1. 枪管、瞄具、弓弦等第一槽位
+2. 弹匣、电池、箭杆等第二槽位
+3. 第一特性槽
+4. 第二特性槽
+
+实际生成时不会盲目相信列序，而是根据推荐词条在各 socket 中的名称覆盖率推断对应关系，再以 socket 分类和原始顺序打破平局。
+
+## 多版本兼容策略
+
+默认设置为：
 
 ```text
-名字, Perk, Perk, Perk 1, Perk 2, 注释, Tier
+weapon_version_mode = all
+version_perk_policy = drop_unsupported
 ```
 
-说明：
+因此同名历史版本会分别生成：
 
-- `名字`：武器名。
-- 所有包含 `Perk` 的列都会作为 perk 列。
-- 单元格中多行 perk 会自动展开。
-- 例如 `滑射\n快速命中` 会被视为两个可选 perk，并与其他列做组合。
-- `注释`、`Tier`、`Rank` 会写入分组级 `//notes:`，格式接近官方工具导出的 block note。
+- 当前版本支持全部推荐 perk：生成完整笛卡尔积。
+- 只支持部分 perk：生成兼容子集，并在标题标记 `[兼容子集]`。
+- 某个槽位没有兼容 perk：省略该槽位，继续匹配其他槽位。
+- 一个推荐 perk 都不支持：跳过该版本。
 
+使用 `--version-perk-policy strict` 可以在任一推荐 perk 不受支持时跳过整个版本；使用 `--weapon-version-mode single` 可以只选择稳定排序后的第一个同名版本。
 
+## 输出
 
-## 5. 先检查识别结果
+默认写入 `outputs/`：
 
-脚本会额外输出：
+- `dim_wishlist_resolved.txt`：可导入 DIM 的愿望单。
+- `dim_wishlist_unresolved.csv`：不兼容、未匹配或完全跳过的项目。
+- `dim_wishlist_resolved_audit.csv`：每条 DIM 规则实际采用的版本、槽位和 perk。
+- `dim_wishlist_perk_candidates.csv`：每个版本/socket 的匹配过程。
+- `dim_wishlist_weapon_candidates.csv`：同名武器版本候选。
+- `dim_wishlist_extracted.csv`：原始表解析和笛卡尔积展开结果。
 
-```text
-dim_wishlist_extracted.csv
+审计 CSV 是可重复生成的本地文件，默认不提交；仓库保留最终的 `outputs/dim_wishlist_resolved.txt` 供 DIM 使用。
+
+## 测试
+
+```bash
+python3 -m unittest discover -s tests -v
 ```
 
-这个文件不依赖 hash 匹配，只反映脚本从原始推荐表里读到了什么。重点看这些列：
-
-- `source_row`：原始表中的数据行编号；
-- `weapon`：识别出的武器名；
-- `expanded_perks`：展开后的单条 perk 组合；
-- `notes`：由 `Tier`、`Rank`、`注释` 合成的说明；
-- `raw_perk_columns_json`：原始 perk 单元格内容；
-- `parsed_perk_columns_json`：每个 perk 列被拆分成了哪些候选 perk。
-
-如果这里已经漏了武器、perk 被错误拆开，或者多行内容没有展开对，先改原始表或分隔符，再重新生成愿望单。
-
-## 6. 输出格式
-
-当前脚本输出接近官方工具样式：
-
-```text
-// 武器名 - recommended
-//notes: Tier S | PvE
-dimwishlist:item=武器hash&perks=perk1hash,perk2hash,perk3hash
-dimwishlist:item=另一个版本hash&perks=perk1hash,perk2hash,perk3hash
-```
-
-说明：
-
-- `// 武器名 - recommended` 是普通注释。
-- `//notes:` 是 block note，会作用于下面连续的 DIM 规则。
-- 每条 `dimwishlist:` 规则末尾不再追加 `#notes:`。
-
-## 7. 同名不同版本
-
-如果 manifest 中同一个武器名对应多个武器 hash，脚本会为每个版本都生成同一套 perk 组合。
-
-例如：
-
-```text
-玫瑰 + 滑射 + 首发
-```
-
-如果查到 3 个 `玫瑰` 版本，会生成 3 条 DIM 规则。
-
-## 8. 未匹配结果
-
-如果武器或 perk 没查到，会写入：
-
-```text
-dim_wishlist_unresolved.csv
-```
-
-你需要重点看这个文件。常见原因：
-
-- 表格里的中文名和 manifest 名字不完全一致；
-- perk 是俗称，不是官方译名；
-- 写了组合说明，而不是单个 perk 名；
-- manifest 语言版本不匹配。
-
-## 9. 导入 DIM
-
-把生成的 `dim_wishlist_resolved.txt` 放到 GitHub public gist 或 public repo，取 raw 链接，在 DIM 设置里添加为外部 wish list。
-
-也可以先打开文件检查格式。
+测试覆盖 hash 的 signed/unsigned 转换、重复表头和多选 perk 展开，以及同名武器旧版本的兼容降级。

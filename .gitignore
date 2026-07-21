@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.manifest_cache/
+world_sql_content_*.content
+dim_wishlist_output/
+
+# Generated audit files can be rebuilt locally; the importable wishlist remains tracked.
+outputs/*.csv
