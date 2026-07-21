@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Backward-compatible entry point for the modular DIM wishlist builder."""
 
-from dim_wishlist.cli import main
+from dim_wishlist.app import main
 
 
 if __name__ == "__main__":

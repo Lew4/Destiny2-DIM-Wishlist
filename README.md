@@ -1,111 +1,144 @@
-# Destiny 2 DIM 中文愿望单生成器
+# Destiny 2 DIM 双输入愿望单生成器
 
-把中文武器推荐表转换成 [Destiny Item Manager](https://app.destinyitemmanager.com/) 可导入的 Wishlist。工具会使用本地 Bungie Manifest，在具体武器版本的具体 socket 内解析 perk，避免同名 perk 或历史武器版本使用错误 hash。
+把中文武器推荐转换成 [Destiny Item Manager](https://app.destinyitemmanager.com/) 可导入的 Wishlist。一个项目支持两种来源：
+
+- `text`：武器名和 perk 都是 CSV/XLSX 单元格文字。
+- `icon`：武器名是文字，但 PVE/PVP 三、四号位 perk 是 XLSX 内嵌图片。
+
+两种模式共用同一套 Bungie Manifest、武器版本检索和 uint32 hash 处理逻辑。最终 perk hash 始终由具体武器版本的合法 socket 决定。
 
 ## 项目结构
 
 ```text
-dim_wishlist_builder.py       兼容入口，仍可直接运行
+dim_wishlist_builder.py       统一兼容入口
 dim_wishlist/
-  cli.py                      命令行和完整流程编排
-  config.py                   默认配置、生成策略和公共常量
-  manifest.py                 Manifest 读取、socket 推断和 perk 解析
-  table.py                    CSV/XLSX 读取、列识别和组合展开
-  wishlist.py                 武器版本处理及 DIM 规则生成
-  reports.py                  审计和候选报告
-  models.py                   数据模型
-  utils.py                    文本、hash、文件和 CSV 工具
-tests/                        不依赖真实 Manifest 的单元测试
-examples/                     示例推荐表
-outputs/                      默认输出目录
+  app.py                      text/icon 命令分发
+  cli.py                      文字表工作流
+  table.py                    文字CSV/XLSX解析
+  wishlist.py                 文字推荐的版本兼容与DIM生成
+  reports.py                  文字推荐审计报告
+  icon_cli.py                 图标XLSX工作流
+  icon_xlsx.py                drawing anchor与内嵌图片提取
+  icon_matching.py            图像归一化和官方图标识别
+  icon_wishlist.py            trait socket校验和DIM生成
+  icon_reports.py             图标匹配审核报告
+  manifest.py                 共享Manifest索引与socket能力
+  config.py/icon_config.py    两种工作流配置
+  models.py/icon_models.py    数据模型
+  utils.py                    共享工具
+examples/
+  sample_recommendations.csv  文字表示例
+  d2.xlsx                     图标型XLSX验证样例
+tests/                        单元和提取回归测试
+outputs/                      两种模式的统一输出目录
 ```
 
-## 安装
+## 安装和Manifest
 
-需要 Python 3.9 或更高版本。CSV 输入只使用标准库；读取 XLSX 需要 `openpyxl`：
+需要 Python 3.9 或更高版本：
 
 ```bash
 python3 -m pip install -r requirements.txt
 ```
 
-从 Bungie 下载对应语言的 `world_sql_content_*.content`，放到项目根目录。Manifest 通常有数百 MB，已被 `.gitignore` 排除，不会提交到仓库。
+依赖包括 `openpyxl`、`Pillow` 和 `numpy`。从 Bungie 下载对应语言的 `world_sql_content_*.content` 放在项目根目录。Manifest 通常有数百 MB，已被 `.gitignore` 排除。
 
-## 运行
+## 统一命令
 
-仓库中的文件名已经设为默认值，直接运行即可：
+```bash
+python3 dim_wishlist_builder.py --help
+python3 dim_wishlist_builder.py text --help
+python3 dim_wishlist_builder.py icon --help
+```
+
+也支持：
+
+```bash
+python3 -m dim_wishlist text
+python3 -m dim_wishlist icon
+```
+
+没有写子命令时默认使用 `text`，因此原来的运行方式完全兼容：
 
 ```bash
 python3 dim_wishlist_builder.py
 ```
 
-也可以显式指定路径和策略：
+## 文字表模式
 
 ```bash
-python3 dim_wishlist_builder.py \
-  --input examples/sample_recommendations.csv \
-  --manifest /path/to/world_sql_content.content \
+python3 dim_wishlist_builder.py text \
+  --input 命运2-凯旋丰碑全种类武器推荐-Sheet1.csv \
+  --manifest world_sql_content_xxx.content \
+  --output-dir outputs
+```
+
+支持 `.csv`、`.xlsx` 和 `.xlsm`。工具会识别 `名字`、`武器`、`name` 等武器列以及所有包含 `Perk` 的列，保留重复表头，跳过分段中重复出现的表头，并把多行或 `/`、`、`、`,` 分隔的 perk 展开为笛卡尔积。
+
+四个输入列分别代表枪管/瞄具、弹匣/电池、第一特性和第二特性。实际匹配会根据名称覆盖率推断它们对应的真实 socket，不盲目依赖列序。
+
+默认处理同名武器的全部历史版本。旧版本缺少部分推荐 perk 时会生成 `[兼容子集]`；使用 `--version-perk-policy strict` 可改为整版跳过。
+
+文字模式输出：
+
+- `dim_wishlist_resolved.txt`
+- `dim_wishlist_unresolved.csv`
+- `dim_wishlist_resolved_audit.csv`
+- `dim_wishlist_perk_candidates.csv`
+- `dim_wishlist_weapon_candidates.csv`
+- `dim_wishlist_extracted.csv`
+
+## 图标XLSX模式
+
+首次建议只检查XLSX结构，不读Manifest、不访问网络：
+
+```bash
+python3 dim_wishlist_builder.py icon \
+  --input examples/d2.xlsx \
   --output-dir outputs \
-  --weapon-version-mode all \
-  --version-perk-policy drop_unsupported
+  --run-mode extract_only
 ```
 
-查看完整参数：
+完整生成：
 
 ```bash
-python3 dim_wishlist_builder.py --help
+python3 dim_wishlist_builder.py icon \
+  --input examples/d2.xlsx \
+  --manifest world_sql_content_xxx.content \
+  --output-dir outputs \
+  --run-mode full
 ```
 
-也支持包入口：
+### 它如何识别图标
 
-```bash
-python3 -m dim_wishlist
-```
-
-## 输入格式
-
-支持 `.csv`、`.xlsx` 和 `.xlsm`。武器列默认识别 `名字`、`武器`、`name` 等名称；所有列名包含 `Perk` 的列会作为词条列。重复的 `Perk` 表头会被保留，多行或以 `/`、`、`、`,` 等分隔的 perk 会自动展开为组合。
-
-仓库原始表按武器类型分段，每段重复表头。解析器会识别第一段真实表头并跳过后续重复表头。
-
-四个 perk 列依次对应：
-
-1. 枪管、瞄具、弓弦等第一槽位
-2. 弹匣、电池、箭杆等第二槽位
-3. 第一特性槽
-4. 第二特性槽
-
-实际生成时不会盲目相信列序，而是根据推荐词条在各 socket 中的名称覆盖率推断对应关系，再以 socket 分类和原始顺序打破平局。
-
-## 多版本兼容策略
-
-默认设置为：
+这不是OCR，也不依赖屏幕截图坐标。工具直接打开XLSX压缩结构，读取 worksheet、drawing relationship 和 two-cell/one-cell anchor，将每张内嵌图片定位到：
 
 ```text
-weapon_version_mode = all
-version_perk_policy = drop_unsupported
+武器名称 → PVE/PVP → trait_3/trait_4 → 槽内第几个候选
 ```
 
-因此同名历史版本会分别生成：
+之后执行两阶段解析：
 
-- 当前版本支持全部推荐 perk：生成完整笛卡尔积。
-- 只支持部分 perk：生成兼容子集，并在标题标记 `[兼容子集]`。
-- 某个槽位没有兼容 perk：省略该槽位，继续匹配其他槽位。
-- 一个推荐 perk 都不支持：跳过该版本。
+1. 每个唯一Excel图标只在全局官方普通特性图标库中识别一次。
+2. 对每个武器版本，只在严格的普通 trait socket 中选择该视觉对应的实际 hash。
 
-使用 `--version-perk-policy strict` 可以在任一推荐 perk 不受支持时跳过整个版本；使用 `--weapon-version-mode single` 可以只选择稳定排序后的第一个同名版本。
+官方图标首次运行会从 Bungie 下载并缓存在 `outputs/.official_icon_cache/`。匹配依次利用原文件SHA-256、透明边缘裁切后的规范像素、透明轮廓SSIM/IoU、灰度结构、边缘余弦、dHash以及±2像素平移搜索。默认阈值为相似度 `0.935`、不同perk名称候选间距 `0.025`。
 
-## 输出
+图标模式输出：
 
-默认写入 `outputs/`：
+- `dim_icon_wishlist_resolved.txt`：最终PVE/PVP Wishlist。
+- `icon_global_review.html`：184个唯一图标的人工审核页。
+- `icon_global_matches.csv` / `icon_global_unresolved.csv`：全局视觉识别。
+- `icon_matches.csv` / `icon_unresolved.csv`：武器版本和socket解析。
+- `dim_icon_wishlist_audit.csv`：最终组合审核。
+- `icon_weapon_candidates.csv`：同名武器候选。
+- `icon_extracted.csv`、`extracted_icons/`：XLSX提取结果。
 
-- `dim_wishlist_resolved.txt`：可导入 DIM 的愿望单。
-- `dim_wishlist_unresolved.csv`：不兼容、未匹配或完全跳过的项目。
-- `dim_wishlist_resolved_audit.csv`：每条 DIM 规则实际采用的版本、槽位和 perk。
-- `dim_wishlist_perk_candidates.csv`：每个版本/socket 的匹配过程。
-- `dim_wishlist_weapon_candidates.csv`：同名武器版本候选。
-- `dim_wishlist_extracted.csv`：原始表解析和笛卡尔积展开结果。
+建议先查看 `icon_global_review.html`，再处理 `icon_unresolved.csv` 中的版本不兼容项。
 
-审计 CSV 是可重复生成的本地文件，默认不提交；仓库保留最终的 `outputs/dim_wishlist_resolved.txt` 供 DIM 使用。
+## 输出和版本控制
+
+两种模式统一写入 `outputs/`，文件名互不冲突。审计CSV、HTML、提取图标和官方图标缓存均可重复生成，默认不提交；仓库只保留最终两个Wishlist文本。
 
 ## 测试
 
@@ -113,4 +146,4 @@ version_perk_policy = drop_unsupported
 python3 -m unittest discover -s tests -v
 ```
 
-测试覆盖 hash 的 signed/unsigned 转换、重复表头和多选 perk 展开，以及同名武器旧版本的兼容降级。
+测试覆盖文字表解析、signed/unsigned hash、旧版本兼容降级、真实样例XLSX的drawing提取，以及图标缩放和平移容忍。完整真实Manifest回归应保持：4115个drawing、3216个perk图标位置、184个唯一perk图标和6105条图标Wishlist规则。

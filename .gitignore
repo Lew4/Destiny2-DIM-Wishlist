@@ -6,3 +6,13 @@ dim_wishlist_output/
 
 # Generated audit files can be rebuilt locally; the importable wishlist remains tracked.
 outputs/*.csv
+outputs/*.json
+outputs/*.html
+outputs/extracted_icons/
+outputs/unresolved_icons/
+outputs/.official_icon_cache/
+
+# Local source copy and macOS metadata are not part of the merged project.
+dim_wishlist_dual_builder/
+.DS_Store
+._*
