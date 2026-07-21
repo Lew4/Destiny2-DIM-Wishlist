@@ -14,13 +14,30 @@ from .utils import csv_write, norm_name
 
 
 MATCH_FIELDS = [
-    "excel_row", "weapon_name", "weapon_type", "weapon_hash", "usage", "source_slot", "slot",
+    "excel_row", "weapon_name", "manifest_weapon_name", "weapon_type", "weapon_hash",
+    "usage", "source_slot", "slot",
     "slot_position", "source_cell", "icon_sha256", "exported_icon", "socket_index",
-    "mapping_method", "mapping_hits", "accepted", "reason", "recognized_names",
+    "mapping_method", "mapping_hits", "slot_corrected", "accepted", "reason", "recognized_names",
     "global_visual_id", "global_score", "global_margin", "global_match_method",
     "selected_perk_name", "selected_perk_hash", "socket_matching_names",
     "socket_matching_hashes", "socket_candidate_names", "socket_candidate_hashes",
 ]
+
+
+def resolve_manifest_weapon_name(
+    config: IconBuilderConfig, weapon_name: str, weapon_type: str,
+) -> str:
+    """Apply narrowly scoped corrections for duplicate or mistranslated Chinese names."""
+    source_name = norm_name(weapon_name)
+    source_type = norm_name(weapon_type)
+    for identity, manifest_name in config.weapon_identity_overrides.items():
+        expected_name, _, expected_type = identity.partition("|")
+        if (
+            norm_name(expected_name) == source_name
+            and (not expected_type or norm_name(expected_type) == source_type)
+        ):
+            return manifest_name
+    return weapon_name
 
 
 def write_extracted_report(path: Path, contexts: Sequence[IconContext]) -> None:
@@ -108,10 +125,21 @@ def write_global_reports(
     )
 
 
-def select_weapon_versions(config: IconBuilderConfig, weapon_name: str, candidates: Sequence[Any]) -> List[Any]:
+def select_weapon_versions(
+    config: IconBuilderConfig,
+    weapon_name: str,
+    candidates: Sequence[Any],
+    excel_row: Any = None,
+) -> List[Any]:
     if not candidates:
         return []
     key = norm_name(weapon_name)
+    source_key = f"{excel_row}|{key}"
+    for identity, hashes in config.source_weapon_hash_overrides.items():
+        raw_row, _, raw_name = identity.partition("|")
+        if f"{raw_row}|{norm_name(raw_name)}" == source_key:
+            allowed = {int(item_hash) for item_hash in hashes}
+            return [item for item in candidates if item.hash in allowed]
     for name, hashes in config.weapon_hash_overrides.items():
         if norm_name(name) == key:
             allowed = {int(item_hash) for item_hash in hashes}
@@ -130,16 +158,30 @@ def write_weapon_report(
     contexts: Sequence[IconContext],
 ) -> None:
     rows = []
-    for name in dict.fromkeys(context.weapon_name for context in contexts):
-        candidates = index.find_weapons(name)
+    identities = dict.fromkeys(
+        (context.excel_row, context.weapon_name, context.weapon_type)
+        for context in contexts
+    )
+    for excel_row, name, weapon_type in identities:
+        manifest_name = resolve_manifest_weapon_name(config, name, weapon_type)
+        candidates = index.find_weapons(manifest_name)
         selected_hashes = {
-            item.hash for item in select_weapon_versions(config, name, candidates)
+            item.hash for item in select_weapon_versions(
+                config, manifest_name, candidates, excel_row
+            )
         }
         if not candidates:
-            rows.append({"weapon_name": name, "candidate_count": 0, "selected": "no"})
+            rows.append({
+                "excel_row": excel_row, "weapon_name": name,
+                "manifest_weapon_name": manifest_name,
+                "weapon_type": weapon_type, "candidate_count": 0, "selected": "no",
+            })
         for item in candidates:
             rows.append({
                 "weapon_name": name,
+                "excel_row": excel_row,
+                "manifest_weapon_name": manifest_name,
+                "weapon_type": weapon_type,
                 "candidate_count": len(candidates),
                 "selected": "yes" if item.hash in selected_hashes else "no",
                 "weapon_hash": item.hash,
@@ -148,9 +190,121 @@ def write_weapon_report(
                 "item_type_display": item.item_type_display,
             })
     csv_write(path, rows, [
-        "weapon_name", "candidate_count", "selected", "weapon_hash", "weapon_sqlite_id",
-        "manifest_name", "item_type_display",
+        "excel_row", "weapon_name", "manifest_weapon_name", "weapon_type",
+        "candidate_count", "selected",
+        "weapon_hash", "weapon_sqlite_id", "manifest_name", "item_type_display",
     ])
+
+
+def _source_key(row: Dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        row.get("excel_row"), row.get("weapon_name"), row.get("weapon_type"),
+        row.get("usage"), row.get("source_cell"), row.get("icon_sha256"),
+    )
+
+
+def _group_key(row: Dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        row.get("excel_row"), row.get("weapon_name"), row.get("weapon_type"),
+        row.get("usage"),
+    )
+
+
+def classify_version_results(
+    matches: List[Dict[str, Any]], unresolved: List[Dict[str, Any]],
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Separate real source issues from harmless same-name historical-version misses."""
+    accepted_sources = {
+        _source_key(row) for row in matches if row.get("accepted") == "yes"
+    }
+    excluded_sources = {
+        _source_key(row) for row in matches if row.get("accepted") == "excluded"
+    }
+    real_unresolved_by_source: Dict[tuple[Any, ...], Dict[str, Any]] = {}
+    historical_candidates = []
+    for row in unresolved:
+        key = _source_key(row)
+        if key in excluded_sources:
+            continue
+        if key in accepted_sources:
+            historical_candidates.append(row)
+        else:
+            real_unresolved_by_source.setdefault(key, row)
+
+    all_rows = [
+        row for row in matches + unresolved
+        if row.get("accepted") in {"yes", "no"}
+        and _source_key(row) not in excluded_sources
+    ]
+    expected_by_group: Dict[tuple[Any, ...], set[tuple[Any, ...]]] = {}
+    accepted_by_version: Dict[tuple[tuple[Any, ...], Any], set[tuple[Any, ...]]] = {}
+    versions_by_group: Dict[tuple[Any, ...], set[Any]] = {}
+    example_by_group: Dict[tuple[Any, ...], Dict[str, Any]] = {}
+    for row in all_rows:
+        group = _group_key(row)
+        source = _source_key(row)
+        weapon_hash = row.get("weapon_hash")
+        expected_by_group.setdefault(group, set()).add(source)
+        versions_by_group.setdefault(group, set()).add(weapon_hash)
+        example_by_group.setdefault(group, row)
+        if row.get("accepted") == "yes":
+            accepted_by_version.setdefault((group, weapon_hash), set()).add(source)
+
+    source_issue_rows = []
+    history_summary_rows = []
+    full_group_keys = set()
+    for group, expected in expected_by_group.items():
+        version_hashes = sorted(
+            (value for value in versions_by_group[group] if value not in (None, "")),
+            key=lambda value: int(value),
+        )
+        full = []
+        partial = []
+        unsupported = []
+        best_coverage = 0
+        for weapon_hash in version_hashes:
+            count = len(accepted_by_version.get((group, weapon_hash), set()))
+            best_coverage = max(best_coverage, count)
+            if count == len(expected):
+                full.append(weapon_hash)
+            elif count:
+                partial.append(weapon_hash)
+            else:
+                unsupported.append(weapon_hash)
+        example = example_by_group[group]
+        row = {
+            "excel_row": group[0],
+            "weapon_name": group[1],
+            "manifest_weapon_name": example.get("manifest_weapon_name", group[1]),
+            "weapon_type": group[2],
+            "usage": group[3],
+            "recommendation_count": len(expected),
+            "best_matched_count": best_coverage,
+            "full_version_hashes": " / ".join(map(str, full)),
+            "partial_version_hashes": " / ".join(map(str, partial)),
+            "unsupported_version_hashes": " / ".join(map(str, unsupported)),
+        }
+        if full:
+            full_group_keys.add(group)
+            if partial or unsupported:
+                history_summary_rows.append(row)
+        else:
+            missing_names = sorted({
+                item.get("recognized_names", "")
+                for item in real_unresolved_by_source.values()
+                if _group_key(item) == group and item.get("recognized_names")
+            })
+            row["reason"] = (
+                "recommendations_split_across_versions"
+                if not missing_names else "recommendations_not_supported_by_any_complete_version"
+            )
+            row["unmatched_recommendations"] = " / ".join(missing_names)
+            source_issue_rows.append(row)
+
+    historical_rows = [
+        row for row in historical_candidates if _group_key(row) in full_group_keys
+    ]
+    return list(real_unresolved_by_source.values()), historical_rows, source_issue_rows + history_summary_rows
 
 
 def write_final_reports(
@@ -160,15 +314,55 @@ def write_final_reports(
     unresolved: List[Dict[str, Any]],
     wishlist_lines: List[str],
     audit: List[Dict[str, Any]],
-) -> None:
-    csv_write(output_dir / config.matches_filename, matches, MATCH_FIELDS)
-    csv_write(output_dir / config.unresolved_filename, unresolved, MATCH_FIELDS + ["generated"])
-    csv_write(output_dir / config.audit_filename, audit, [
-        "excel_row", "weapon_name", "weapon_hash", "usage", "slot_2_names",
-        "slot_2_hashes", "trait_3_names", "trait_3_hashes", "trait_4_names",
-        "trait_4_hashes", "wishlist_perks",
-        "combination_count", "partial", "mapping_method", "mapping_hits",
-    ])
+) -> Dict[str, int]:
+    real_unresolved, historical_rows, group_rows = classify_version_results(
+        matches, unresolved
+    )
+    excluded_by_source: Dict[tuple[Any, ...], Dict[str, Any]] = {}
+    for row in matches:
+        if row.get("accepted") == "excluded":
+            excluded_by_source.setdefault(_source_key(row), row)
+    source_issue_rows = [row for row in group_rows if row.get("reason")]
+    history_summary_rows = [row for row in group_rows if not row.get("reason")]
+    summary_fields = [
+        "excel_row", "weapon_name", "manifest_weapon_name", "weapon_type", "usage",
+        "recommendation_count", "best_matched_count", "full_version_hashes",
+        "partial_version_hashes", "unsupported_version_hashes", "reason",
+        "unmatched_recommendations",
+    ]
+    if config.write_diagnostics:
+        csv_write(output_dir / config.matches_filename, matches, MATCH_FIELDS)
+        csv_write(
+            output_dir / config.excluded_recommendations_filename,
+            list(excluded_by_source.values()), MATCH_FIELDS,
+        )
+        csv_write(
+            output_dir / config.unresolved_filename, real_unresolved,
+            MATCH_FIELDS + ["generated"],
+        )
+        csv_write(
+            output_dir / config.history_compatibility_filename, historical_rows,
+            MATCH_FIELDS + ["generated"],
+        )
+        csv_write(
+            output_dir / config.source_issues_filename, source_issue_rows, summary_fields,
+        )
+        csv_write(
+            output_dir / config.history_summary_filename, history_summary_rows, summary_fields,
+        )
+        csv_write(output_dir / config.audit_filename, audit, [
+            "excel_row", "weapon_name", "manifest_weapon_name", "weapon_hash", "usage",
+            "slot_2_names", "slot_2_hashes", "trait_3_names", "trait_3_hashes",
+            "trait_4_names", "trait_4_hashes", "wishlist_perks", "combination_count",
+            "partial", "mapping_method", "mapping_hits",
+        ])
     (output_dir / config.wishlist_filename).write_text(
         "\n".join(wishlist_lines).rstrip() + "\n", encoding="utf-8"
     )
+    return {
+        "source_unresolved": len(real_unresolved),
+        "source_issue_groups": len(source_issue_rows),
+        "historical_version_rows": len(historical_rows),
+        "historical_groups": len(history_summary_rows),
+        "excluded_recommendations": len(excluded_by_source),
+    }

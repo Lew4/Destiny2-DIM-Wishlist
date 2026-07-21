@@ -15,7 +15,23 @@ class IconBuilderConfig:
     cache_dir: Path = Path("./.manifest_cache")
     run_mode: str = "full"
     weapon_version_mode: str = "all"
+    write_diagnostics: bool = False
     weapon_hash_overrides: Dict[str, List[int]] = field(default_factory=dict)
+    source_weapon_hash_overrides: Dict[str, List[int]] = field(default_factory=lambda: {
+        # 同名的鲁莽神谕在工作簿中分成救赎花园版和万神殿版。
+        "28|鲁莽神谕": [3385326721, 1992309064],
+        "142|鲁莽神谕": [1802315656, 4158265643],
+    })
+    weapon_identity_overrides: Dict[str, str] = field(default_factory=lambda: {
+        # 工作簿中这把烈日速射斥候被写成了手炮“信任”的中文名。
+        "信任|烈日速射斥候": "受托",
+    })
+    recommendation_exclusions: Dict[str, List[str]] = field(default_factory=lambda: {
+        "28|鲁莽神谕|pve": ["集体爆破"],
+        "48|纪念|pve": ["瓦解"],
+        "60|裁决定论|pvp": ["打烊时间"],
+        "108|低温重炮|pve": ["金中藏弹"],
+    })
     icon_name_overrides: Dict[str, str] = field(default_factory=lambda: {
         "5c78d6484ded3f3092ca0fbd4e3fb410cc904e4710103cd795b97d769c9ef668": "超频散热器",
     })
@@ -39,6 +55,10 @@ class IconBuilderConfig:
     extracted_filename: str = "icon_extracted.csv"
     matches_filename: str = "icon_matches.csv"
     unresolved_filename: str = "icon_unresolved.csv"
+    history_compatibility_filename: str = "icon_history_compatibility.csv"
+    history_summary_filename: str = "icon_history_summary.csv"
+    source_issues_filename: str = "icon_source_issues.csv"
+    excluded_recommendations_filename: str = "icon_excluded_recommendations.csv"
     wishlist_filename: str = "dim_icon_wishlist_resolved.txt"
     audit_filename: str = "dim_icon_wishlist_audit.csv"
     weapon_candidates_filename: str = "icon_weapon_candidates.csv"

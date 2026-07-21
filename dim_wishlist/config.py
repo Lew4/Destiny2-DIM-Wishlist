@@ -18,6 +18,7 @@ class BuilderConfig:
     cache_dir: Path = Path("./.manifest_cache")
     weapon_version_mode: str = "all"
     version_perk_policy: str = "drop_unsupported"
+    write_diagnostics: bool = False
     weapon_hash_overrides: Dict[str, List[int]] = field(default_factory=dict)
 
     wishlist_filename: str = "dim_wishlist_resolved.txt"

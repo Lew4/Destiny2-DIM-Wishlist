@@ -170,5 +170,6 @@ def write_generation_outputs(
     (output_dir / config.wishlist_filename).write_text(
         "\n".join(lines) + "\n", encoding="utf-8"
     )
-    csv_write(output_dir / config.unresolved_filename, unresolved, UNRESOLVED_FIELDS)
-    csv_write(output_dir / config.resolved_audit_filename, audit, AUDIT_FIELDS)
+    if config.write_diagnostics:
+        csv_write(output_dir / config.unresolved_filename, unresolved, UNRESOLVED_FIELDS)
+        csv_write(output_dir / config.resolved_audit_filename, audit, AUDIT_FIELDS)

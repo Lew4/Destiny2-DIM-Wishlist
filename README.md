@@ -83,11 +83,9 @@ python3 dim_wishlist_builder.py text \
 文字模式输出：
 
 - `dim_wishlist_resolved.txt`
-- `dim_wishlist_unresolved.csv`
-- `dim_wishlist_resolved_audit.csv`
-- `dim_wishlist_perk_candidates.csv`
-- `dim_wishlist_weapon_candidates.csv`
-- `dim_wishlist_extracted.csv`
+
+默认只保留最终 Wishlist。需要排查时加 `--diagnostics`，才会额外生成
+`dim_wishlist_unresolved.csv`、审计、候选和提取报告。
 
 ## 图标XLSX模式
 
@@ -99,6 +97,8 @@ python3 dim_wishlist_builder.py icon \
   --output-dir outputs \
   --run-mode extract_only
 ```
+
+`extract_only` 本身属于诊断模式，会保留提取报告和图标。
 
 完整生成：
 
@@ -123,6 +123,14 @@ python3 dim_wishlist_builder.py icon \
 1. 每个唯一Excel图标只在全局官方普通特性图标库中识别一次。
 2. 对每个武器版本，只在严格的普通 trait socket 中选择该视觉对应的实际 hash。
 
+如果图标在工作簿中误放到另一列，但在该武器版本中只对应一个真实 trait
+socket，程序会按 Manifest 自动纠正到实际三号位或四号位。工作簿中同名但武器
+类型不同的误译也可以用“武器名 + 武器类型”覆盖，避免例如烈日速射斥候
+“受托”被误匹配成手炮“信任”。
+
+同一中文名在工作簿中明确代表不同来源版本时，可以按“Excel 行号 + 武器名”
+限定 hash；明确取消的推荐会记录为排除项，不参与规则组合，也不会出现在错误报告中。
+
 少数工作簿会把非trait perk图标放在trait展示区域。此类图标使用按内容SHA-256记录的“名称 + 语义槽位”覆盖，仍必须通过具体武器socket校验。例如维卡拉微冲4的 `AG226` 实际是二号位“超频散热器”；工具会在socket 2选择普通版hash，而不会误当成三号特性或选择强化版。
 
 官方图标首次运行会从 Bungie 下载并缓存在 `outputs/.official_icon_cache/`。匹配依次利用原文件SHA-256、透明边缘裁切后的规范像素、透明轮廓SSIM/IoU、灰度结构、边缘余弦、dHash以及±2像素平移搜索。默认阈值为相似度 `0.935`、不同perk名称候选间距 `0.025`。
@@ -130,18 +138,27 @@ python3 dim_wishlist_builder.py icon \
 图标模式输出：
 
 - `dim_icon_wishlist_resolved.txt`：最终PVE/PVP Wishlist。
+
+默认只保留最终 Wishlist 和隐藏的官方图标缓存。需要审核时加 `--diagnostics`，
+才会额外生成以下文件：
+
 - `icon_global_review.html`：184个唯一图标的人工审核页。
 - `icon_global_matches.csv` / `icon_global_unresolved.csv`：全局视觉识别。
-- `icon_matches.csv` / `icon_unresolved.csv`：武器版本和socket解析。
+- `icon_matches.csv`：全部武器版本和 socket 的详细解析。
+- `icon_unresolved.csv` / `icon_source_issues.csv`：跨全部版本后仍然存在的真实问题。
+- `icon_excluded_recommendations.csv`：人工明确取消、不参与生成的推荐。
+- `icon_history_compatibility.csv` / `icon_history_summary.csv`：旧版本缺少perk的兼容记录；只要至少一个版本完整匹配，就不会算作错误。
 - `dim_icon_wishlist_audit.csv`：最终组合审核。
 - `icon_weapon_candidates.csv`：同名武器候选。
 - `icon_extracted.csv`、`extracted_icons/`：XLSX提取结果。
 
-建议先查看 `icon_global_review.html`，再处理 `icon_unresolved.csv` 中的版本不兼容项。
+诊断运行后可查看 `icon_global_review.html`，再处理 `icon_unresolved.csv` 中的问题。
 
 ## 输出和版本控制
 
-两种模式统一写入 `outputs/`，文件名互不冲突。审计CSV、HTML、提取图标和官方图标缓存均可重复生成，默认不提交；仓库只保留最终两个Wishlist文本。
+两种模式统一写入 `outputs/`，文件名互不冲突。普通运行时该目录只显示最终
+两个 Wishlist 文本；审计 CSV、HTML 和提取图标仅在 `--diagnostics` 模式生成。
+隐藏的 `.official_icon_cache/` 会保留以避免重复下载。仓库只提交最终两个 Wishlist。
 
 ## 测试
 
@@ -149,4 +166,4 @@ python3 dim_wishlist_builder.py icon \
 python3 -m unittest discover -s tests -v
 ```
 
-测试覆盖文字表解析、signed/unsigned hash、旧版本兼容降级、真实样例XLSX的drawing提取、图标平移容忍和特殊二号位普通/强化perk选择。当前完整真实Manifest回归基线为：4120个drawing、3221个perk图标位置、184/184个唯一perk图标识别成功，以及6240条图标Wishlist规则。
+测试覆盖文字表解析、signed/unsigned hash、旧版本兼容降级、真实样例XLSX的drawing提取、图标平移容忍、错列自动归位、同名武器类型纠正和特殊二号位普通/强化perk选择。当前完整真实Manifest回归基线为：4120个drawing、3221个perk图标位置、184/184个唯一perk图标识别成功，以及6326条图标Wishlist规则。

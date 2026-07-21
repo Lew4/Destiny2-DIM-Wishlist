@@ -218,7 +218,10 @@ def extract_icon_contexts(
         if not weapon_name:
             missing_weapon += 1
             continue
-        exported = export_unique_icon(icon_dir, image)
+        exported = (
+            export_unique_icon(icon_dir, image)
+            if config.write_diagnostics else f"{image.sha256[:24]}{image.extension}"
+        )
         contexts.append(IconContext(
             section_index=sections.index(section_start) + 1,
             excel_row=image.row + 1,

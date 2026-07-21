@@ -95,10 +95,12 @@ dimwishlist:item=501329015&perks=1202584452,3891536761
 
 // 唠叨龙骨 [830651379] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=830651379&perks=1202584452
 dimwishlist:item=830651379&perks=3891536761
 
 // 唠叨龙骨 [4157371152] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=4157371152&perks=1202584452
 dimwishlist:item=4157371152&perks=3891536761
 
 // 唠叨龙骨 [501329015] (pvp)
@@ -135,7 +137,7 @@ dimwishlist:item=2203881482&perks=3523296417,3891536761
 
 // 过去完成时 [1952163498] (pvp) [兼容子集]
 //notes: tags:pvp
-dimwishlist:item=1952163498&perks=2846385770
+dimwishlist:item=1952163498&perks=2846385770,1359896290
 
 // 过去完成时 [2203881482] (pvp)
 //notes: tags:pvp
@@ -146,6 +148,7 @@ dimwishlist:item=2203881482&perks=1359896290,3764420437
 
 // 星狐座 [1622998472] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=1622998472&perks=3700496672,124408337
 dimwishlist:item=1622998472&perks=3700496672,3038247973
 
 // 星狐座 [3245446311] (pve)
@@ -611,7 +614,7 @@ dimwishlist:item=1517780158&perks=3300816228,2679249093
 
 // 大犬座 [2066434718] (pve) [兼容子集]
 //notes: tags:pve
-dimwishlist:item=2066434718&perks=2284787283
+dimwishlist:item=2066434718&perks=2284787283,3425386926
 
 // 大犬座 [2966714447] (pve)
 //notes: tags:pve
@@ -714,6 +717,7 @@ dimwishlist:item=70083888&perks=1115162408,3038247973
 
 // 野兽国度 [654370424] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=654370424&perks=2848615171
 dimwishlist:item=654370424&perks=3038247973
 
 // 野兽国度 [70083888] (pvp)
@@ -760,6 +764,7 @@ dimwishlist:item=2121785039&perks=2039302152,3425386926
 
 // 光明前景 [491078457] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=491078457&perks=776531651
 dimwishlist:item=491078457&perks=2048641572
 
 // 光明前景 [1832481283] (pve)
@@ -1003,10 +1008,12 @@ dimwishlist:item=1541324871&perks=1631667848,1966281507
 
 // 拒绝召唤 [2671849376] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=2671849376&perks=1782407750,923806249
 dimwishlist:item=2671849376&perks=1782407750,1966281507
 
 // 拒绝召唤 [3269398063] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=3269398063&perks=1782407750,923806249
 dimwishlist:item=3269398063&perks=1782407750,1966281507
 
 // 潮人 [2863808104] (pve)
@@ -1132,10 +1139,12 @@ dimwishlist:item=1835232052&perks=1017229899,1089671869
 
 // 送魂者 [3840794631] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=3840794631&perks=3523296417
 dimwishlist:item=3840794631&perks=1089671869
 
 // 送魂者 [4028298892] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=4028298892&perks=3523296417
 dimwishlist:item=4028298892&perks=1089671869
 
 // 格网队长 [1621558458] (pve) [兼容子集]
@@ -1564,29 +1573,12 @@ dimwishlist:item=3393519051&perks=4071163871,2360754333
 dimwishlist:item=4108648762&perks=4071163871,2679249093
 dimwishlist:item=4108648762&perks=4071163871,2360754333
 
-// 鲁莽神谕 [1802315656] (pve) [兼容子集]
-//notes: tags:pve
-dimwishlist:item=1802315656&perks=3182497402,776531651
-dimwishlist:item=1802315656&perks=2048641572,776531651
-dimwishlist:item=1802315656&perks=4019266109,776531651
-
-// 鲁莽神谕 [1992309064] (pve) [兼容子集]
+// 鲁莽神谕 [1992309064] (pve)
 //notes: tags:pve
 dimwishlist:item=1992309064&perks=3182497402,1464081238
 dimwishlist:item=1992309064&perks=3182497402,776531651
 dimwishlist:item=1992309064&perks=2048641572,1464081238
 dimwishlist:item=1992309064&perks=2048641572,776531651
-
-// 鲁莽神谕 [4158265643] (pve) [兼容子集]
-//notes: tags:pve
-dimwishlist:item=4158265643&perks=3182497402,776531651
-dimwishlist:item=4158265643&perks=2048641572,776531651
-dimwishlist:item=4158265643&perks=4019266109,776531651
-
-// 鲁莽神谕 [1802315656] (pvp) [兼容子集]
-//notes: tags:pvp
-dimwishlist:item=1802315656&perks=1015611457
-dimwishlist:item=1802315656&perks=3215448563
 
 // 鲁莽神谕 [1992309064] (pvp)
 //notes: tags:pvp
@@ -1596,11 +1588,6 @@ dimwishlist:item=1992309064&perks=1890422124,3215448563
 // 鲁莽神谕 [3385326721] (pvp) [兼容子集]
 //notes: tags:pvp
 dimwishlist:item=3385326721&perks=1890422124,1015611457
-
-// 鲁莽神谕 [4158265643] (pvp) [兼容子集]
-//notes: tags:pvp
-dimwishlist:item=4158265643&perks=1015611457
-dimwishlist:item=4158265643&perks=3215448563
 
 // 最后劫掠 [1106635211] (pve) [兼容子集]
 //notes: tags:pve
@@ -2007,6 +1994,7 @@ dimwishlist:item=1644501332&perks=2416023159,438098033
 
 // 无名之秋 [3222518097] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=3222518097&perks=2846385770
 dimwishlist:item=3222518097&perks=1015611457
 
 // 全知之眼 [147444292] (pve)
@@ -2157,6 +2145,7 @@ dimwishlist:item=2855157553&perks=2679249093
 
 // 猝死 [4097972038] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=4097972038&perks=2679249093
 dimwishlist:item=4097972038&perks=2360754333
 
 // 猝死 [1879212552] (pvp) [兼容子集]
@@ -2332,25 +2321,16 @@ dimwishlist:item=2699423382&perks=4071163871,1194056669
 dimwishlist:item=2699423382&perks=3161816588,47981717
 dimwishlist:item=2699423382&perks=3161816588,1194056669
 
-// 信任 [810474118] (pve) [兼容子集]
+// 信任 → 受托 [1392919471] (pve)
 //notes: tags:pve
-dimwishlist:item=810474118&perks=4293542123
+dimwishlist:item=1392919471&perks=1523832109,4293542123
+dimwishlist:item=1392919471&perks=1523832109,657025441
+dimwishlist:item=1392919471&perks=3017780555,4293542123
+dimwishlist:item=1392919471&perks=3017780555,657025441
 
-// 信任 [2850664015] (pve) [兼容子集]
-//notes: tags:pve
-dimwishlist:item=2850664015&perks=4293542123
-
-// 信任 [810474118] (pvp) [兼容子集]
+// 信任 → 受托 [1392919471] (pvp)
 //notes: tags:pvp
-dimwishlist:item=810474118&perks=3619207468
-
-// 信任 [2850664015] (pvp) [兼容子集]
-//notes: tags:pvp
-dimwishlist:item=2850664015&perks=47981717
-
-// 信任 [4077196130] (pvp) [兼容子集]
-//notes: tags:pvp
-dimwishlist:item=4077196130&perks=47981717
+dimwishlist:item=1392919471&perks=3619207468,47981717
 
 // 第七炽天使VY-7 [766323545] (pve) [兼容子集]
 //notes: tags:pve
@@ -2753,7 +2733,7 @@ dimwishlist:item=690412397&perks=3400784728,1089671869
 dimwishlist:item=3421075982&perks=3400784728,3201496230
 dimwishlist:item=3421075982&perks=3400784728,1089671869
 
-// 纪念 [4230965989] (pve) [兼容子集]
+// 纪念 [4230965989] (pve)
 //notes: tags:pve
 dimwishlist:item=4230965989&perks=1523832109,557221067
 dimwishlist:item=4230965989&perks=1820235745,557221067
@@ -2913,6 +2893,7 @@ dimwishlist:item=1400385226&perks=247725512,3047969693
 
 // 新目标 [1780464822] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=1780464822&perks=124408337
 dimwishlist:item=1780464822&perks=3047969693
 
 // 奥格玛PR6 [324584912] (pve)
@@ -3097,6 +3078,7 @@ dimwishlist:item=4184168210&perks=3038247973,3824105627
 
 // 命运终结者 [2171478765] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=2171478765&perks=3038247973,47981717
 dimwishlist:item=2171478765&perks=3038247973,699525795
 
 // 命运终结者 [4184168210] (pvp)
@@ -3255,12 +3237,14 @@ dimwishlist:item=1874424704&perks=47981717,957782887
 //notes: tags:pvp
 dimwishlist:item=3297863558&perks=47981717,957782887
 
-// 享乐主义 [2263839058] (pvp) [兼容子集]
+// 享乐主义 [2263839058] (pvp)
 //notes: tags:pvp
+dimwishlist:item=2263839058&perks=706527188,1600092898
 dimwishlist:item=2263839058&perks=706527188,2846385770
 
-// 享乐主义 [4124357815] (pvp) [兼容子集]
+// 享乐主义 [4124357815] (pvp)
 //notes: tags:pvp
+dimwishlist:item=4124357815&perks=706527188,1600092898
 dimwishlist:item=4124357815&perks=706527188,2846385770
 
 // 突进 [358190158] (pve)
@@ -3413,7 +3397,7 @@ dimwishlist:item=694500607&perks=1511100135,1089671869
 //notes: tags:pve
 dimwishlist:item=3197270240&perks=3418782618
 
-// 裁决定论 [694500607] (pvp) [兼容子集]
+// 裁决定论 [694500607] (pvp)
 //notes: tags:pvp
 dimwishlist:item=694500607&perks=4071163871,47981717
 
@@ -3609,10 +3593,10 @@ dimwishlist:item=3926987546&perks=2416023159,1194056669
 
 // 惩戒措施 [471518543] (pve) [兼容子集]
 //notes: tags:pve
-dimwishlist:item=471518543&perks=3523296417
-dimwishlist:item=471518543&perks=1820235745
+dimwishlist:item=471518543&perks=3523296417,3824105627
+dimwishlist:item=471518543&perks=1820235745,3824105627
 
-// 惩戒措施 [3654744298] (pve) [兼容子集]
+// 惩戒措施 [3654744298] (pve)
 //notes: tags:pve
 dimwishlist:item=3654744298&perks=3523296417,557221067
 dimwishlist:item=3654744298&perks=3523296417,1134488199
@@ -3626,6 +3610,9 @@ dimwishlist:item=3654744298&perks=2048641572,1089671869
 dimwishlist:item=3654744298&perks=3824105627,557221067
 dimwishlist:item=3654744298&perks=3824105627,1134488199
 dimwishlist:item=3654744298&perks=3824105627,1089671869
+dimwishlist:item=3654744298&perks=3201496230,557221067
+dimwishlist:item=3654744298&perks=3201496230,1134488199
+dimwishlist:item=3654744298&perks=3201496230,1089671869
 
 // 惩戒措施 [471518543] (pvp) [兼容子集]
 //notes: tags:pvp
@@ -3822,6 +3809,7 @@ dimwishlist:item=8293111&perks=3038247973
 
 // 长臂 [14929251] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=14929251&perks=3218042543
 dimwishlist:item=14929251&perks=3038247973
 
 // 长臂 [3418719964] (pve)
@@ -3831,6 +3819,7 @@ dimwishlist:item=3418719964&perks=3218042543,3640170453
 
 // 长臂 [4249949938] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=4249949938&perks=3218042543
 dimwishlist:item=4249949938&perks=3038247973
 
 // 长臂 [8293111] (pvp)
@@ -4417,12 +4406,14 @@ dimwishlist:item=219610523&perks=1754714824,2579169598
 
 // 碎梦者 [2931957300] (pvp) [兼容子集]
 //notes: tags:pvp
-dimwishlist:item=2931957300&perks=1645158859
-dimwishlist:item=2931957300&perks=2039302152
+dimwishlist:item=2931957300&perks=1645158859,1754714824
+dimwishlist:item=2931957300&perks=2039302152,1754714824
 
 // 新太平洋碑文 [492673102] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=492673102&perks=1556840489,2396489472
 dimwishlist:item=492673102&perks=1556840489,3201496230
+dimwishlist:item=492673102&perks=3523296417,2396489472
 dimwishlist:item=492673102&perks=3523296417,3201496230
 
 // 新太平洋碑文 [1125217994] (pve) [兼容子集]
@@ -4432,7 +4423,9 @@ dimwishlist:item=1125217994&perks=3523296417,3201496230
 
 // 新太平洋碑文 [2059741649] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=2059741649&perks=1556840489,2396489472
 dimwishlist:item=2059741649&perks=1556840489,3201496230
+dimwishlist:item=2059741649&perks=3523296417,2396489472
 dimwishlist:item=2059741649&perks=3523296417,3201496230
 
 // 新太平洋碑文 [2988180391] (pve)
@@ -4479,6 +4472,7 @@ dimwishlist:item=1692109318&perks=1115162408,2173046394
 
 // 拯救者的喝彩 [2060863616] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=2060863616&perks=3523296417,2396489472
 dimwishlist:item=2060863616&perks=3523296417,1546637391
 
 // 拯救者的喝彩 [2461640837] (pve)
@@ -4697,12 +4691,14 @@ dimwishlist:item=2776092652&perks=3824105627,4293542123
 
 // 烈焰之锤 [1973107014] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=1973107014&perks=3619207468,588594999
 dimwishlist:item=1973107014&perks=3619207468,555281244
 dimwishlist:item=1973107014&perks=3619207468,699525795
 dimwishlist:item=1973107014&perks=3619207468,47981717
 
 // 烈焰之锤 [2351180975] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=2351180975&perks=588594999
 dimwishlist:item=2351180975&perks=47981717
 
 // 烈焰之锤 [2776092652] (pvp)
@@ -4743,11 +4739,13 @@ dimwishlist:item=3211332727&perks=1359896290,31345821
 
 // 无效安慰 [291447487] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=291447487&perks=1523832109,2978966579
 dimwishlist:item=291447487&perks=1523832109,3194351027
 dimwishlist:item=291447487&perks=1523832109,3078487919
 
 // 无效安慰 [839786290] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=839786290&perks=2978966579
 dimwishlist:item=839786290&perks=3194351027
 dimwishlist:item=839786290&perks=3078487919
 
@@ -4768,6 +4766,7 @@ dimwishlist:item=2287287549&perks=1546637391,3764420437
 
 // 无效安慰 [2760833884] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=2760833884&perks=1523832109,2978966579
 dimwishlist:item=2760833884&perks=1523832109,3194351027
 dimwishlist:item=2760833884&perks=1523832109,3078487919
 
@@ -4783,31 +4782,37 @@ dimwishlist:item=2155534128&perks=1631667848,113508675
 dimwishlist:item=2155534128&perks=1631667848,3764420437
 dimwishlist:item=2155534128&perks=1631667848,1089671869
 
-// 急锋 [189854537] (pve) [兼容子集]
+// 急锋 [189854537] (pve)
 //notes: tags:pve
+dimwishlist:item=189854537&perks=2244851822,3650930298
 dimwishlist:item=189854537&perks=2244851822,3640170453
 dimwishlist:item=189854537&perks=2244851822,3078487919
 dimwishlist:item=189854537&perks=2244851822,3913600130
 dimwishlist:item=189854537&perks=2244851822,3708227201
+dimwishlist:item=189854537&perks=1749209109,3650930298
 dimwishlist:item=189854537&perks=1749209109,3640170453
 dimwishlist:item=189854537&perks=1749209109,3078487919
 dimwishlist:item=189854537&perks=1749209109,3913600130
 dimwishlist:item=189854537&perks=1749209109,3708227201
+dimwishlist:item=189854537&perks=2077819806,3650930298
 dimwishlist:item=189854537&perks=2077819806,3640170453
 dimwishlist:item=189854537&perks=2077819806,3078487919
 dimwishlist:item=189854537&perks=2077819806,3913600130
 dimwishlist:item=189854537&perks=2077819806,3708227201
 
-// 急锋 [2466028274] (pve) [兼容子集]
+// 急锋 [2466028274] (pve)
 //notes: tags:pve
+dimwishlist:item=2466028274&perks=2244851822,3650930298
 dimwishlist:item=2466028274&perks=2244851822,3640170453
 dimwishlist:item=2466028274&perks=2244851822,3078487919
 dimwishlist:item=2466028274&perks=2244851822,3913600130
 dimwishlist:item=2466028274&perks=2244851822,3708227201
+dimwishlist:item=2466028274&perks=1749209109,3650930298
 dimwishlist:item=2466028274&perks=1749209109,3640170453
 dimwishlist:item=2466028274&perks=1749209109,3078487919
 dimwishlist:item=2466028274&perks=1749209109,3913600130
 dimwishlist:item=2466028274&perks=1749209109,3708227201
+dimwishlist:item=2466028274&perks=2077819806,3650930298
 dimwishlist:item=2466028274&perks=2077819806,3640170453
 dimwishlist:item=2466028274&perks=2077819806,3078487919
 dimwishlist:item=2466028274&perks=2077819806,3913600130
@@ -4815,7 +4820,9 @@ dimwishlist:item=2466028274&perks=2077819806,3708227201
 
 // 急锋 [2889501828] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=2889501828&perks=1749209109,3650930298
 dimwishlist:item=2889501828&perks=1749209109,3078487919
+dimwishlist:item=2889501828&perks=2077819806,3650930298
 dimwishlist:item=2889501828&perks=2077819806,3078487919
 
 // 沙玉拉之怒 [2022294213] (pve) [兼容子集]
@@ -5103,17 +5110,23 @@ dimwishlist:item=431721920&perks=3038247973,3640170453
 dimwishlist:item=431721920&perks=3038247973,657025441
 dimwishlist:item=431721920&perks=3038247973,3824105627
 
-// 扎乌利的克星 [3066945855] (pve) [兼容子集]
+// 扎乌利的克星 [3066945855] (pve)
 //notes: tags:pve
 dimwishlist:item=3066945855&perks=3038247973,4293542123
 dimwishlist:item=3066945855&perks=3038247973,3640170453
 dimwishlist:item=3066945855&perks=3038247973,657025441
+dimwishlist:item=3066945855&perks=3824105627,4293542123
+dimwishlist:item=3066945855&perks=3824105627,3640170453
+dimwishlist:item=3066945855&perks=3824105627,657025441
 
-// 扎乌利的克星 [3647341740] (pve) [兼容子集]
+// 扎乌利的克星 [3647341740] (pve)
 //notes: tags:pve
 dimwishlist:item=3647341740&perks=3038247973,4293542123
 dimwishlist:item=3647341740&perks=3038247973,3640170453
 dimwishlist:item=3647341740&perks=3038247973,657025441
+dimwishlist:item=3647341740&perks=3824105627,4293542123
+dimwishlist:item=3647341740&perks=3824105627,3640170453
+dimwishlist:item=3647341740&perks=3824105627,657025441
 
 // 扎乌利的克星 [431721920] (pvp)
 //notes: tags:pvp
@@ -5151,6 +5164,7 @@ dimwishlist:item=2782847179&perks=706527188,47981717
 
 // 纳伊姆的长矛 [2806569825] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=2806569825&perks=1523832109,3993379141
 dimwishlist:item=2806569825&perks=1523832109,555281244
 
 // 纳伊姆的长矛 [4119503981] (pve)
@@ -5636,6 +5650,20 @@ dimwishlist:item=1197073834&perks=3038247973,3938834702
 dimwishlist:item=1197073834&perks=247725512,2458213969
 dimwishlist:item=1197073834&perks=247725512,3938834702
 
+// 明日回答 [1940352487] (pve)
+//notes: tags:pve
+dimwishlist:item=1940352487&perks=3987942396,113508675
+dimwishlist:item=1940352487&perks=3987942396,3078487919
+dimwishlist:item=1940352487&perks=3987942396,3194351027
+dimwishlist:item=1940352487&perks=1523832109,113508675
+dimwishlist:item=1940352487&perks=1523832109,3078487919
+dimwishlist:item=1940352487&perks=1523832109,3194351027
+
+// 明日回答 [3009199534] (pve) [兼容子集]
+//notes: tags:pve
+dimwishlist:item=3009199534&perks=3987942396,3078487919
+dimwishlist:item=3009199534&perks=3987942396,3194351027
+
 // 库里姆的终界 [1321506184] (pve)
 //notes: tags:pve
 dimwishlist:item=1321506184&perks=3523296417,2305480722
@@ -6085,8 +6113,10 @@ dimwishlist:item=2662459958&perks=1556840489,1226351311
 
 // VS寒冷抑制 [1762785662] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=1762785662&perks=3987942396,2978966579
 dimwishlist:item=1762785662&perks=3987942396,3078487919
 dimwishlist:item=1762785662&perks=3987942396,3708227201
+dimwishlist:item=1762785662&perks=3751912585,2978966579
 dimwishlist:item=1762785662&perks=3751912585,3078487919
 dimwishlist:item=1762785662&perks=3751912585,3708227201
 
@@ -6178,6 +6208,7 @@ dimwishlist:item=2872063099&perks=831391274,365154968
 
 // 不朽 [4039572196] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=4039572196&perks=831391274
 dimwishlist:item=4039572196&perks=365154968
 
 // 不朽 [2872063099] (pvp)
@@ -6232,6 +6263,7 @@ dimwishlist:item=1529367715&perks=2579169598,47981717
 
 // 刺骨者 [4037745684] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=4037745684&perks=4071163871
 dimwishlist:item=4037745684&perks=47981717
 
 // 龙䲢 [2888021252] (pve)
@@ -6409,6 +6441,7 @@ dimwishlist:item=3576134513&perks=3987942396,3201496230
 
 // 城主IV [192784503] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=192784503&perks=4293542123
 dimwishlist:item=192784503&perks=3365897133
 
 // 城主IV [471764396] (pve)
@@ -6422,6 +6455,7 @@ dimwishlist:item=471764396&perks=951095735,2890807135
 
 // 城主IV [2932922810] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=2932922810&perks=4293542123
 dimwishlist:item=2932922810&perks=3365897133
 
 // 城主IV [471764396] (pvp)
@@ -6473,8 +6507,9 @@ dimwishlist:item=642545454&perks=3400784728,3673922083
 dimwishlist:item=1700366811&perks=3824105627,2173046394
 dimwishlist:item=1700366811&perks=3218042543,2173046394
 
-// 无视 [2226158470] (pve) [兼容子集]
+// 无视 [2226158470] (pve)
 //notes: tags:pve
+dimwishlist:item=2226158470&perks=3824105627,3218042543
 dimwishlist:item=2226158470&perks=3824105627,2173046394
 
 // 无视 [1700366811] (pvp)
@@ -6560,7 +6595,7 @@ dimwishlist:item=702001725&perks=1359896290,1015611457
 dimwishlist:item=702001725&perks=1359896290,31345821
 dimwishlist:item=702001725&perks=1359896290,365154968
 
-// 低温重炮 [978122008] (pve) [兼容子集]
+// 低温重炮 [978122008] (pve)
 //notes: tags:pve
 dimwishlist:item=978122008&perks=1511100135,1439600632
 dimwishlist:item=978122008&perks=1511100135,3764420437
@@ -7333,7 +7368,9 @@ dimwishlist:item=4146673635&perks=960810156,4104185692
 
 // 忠于职守 [906840740] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=906840740&perks=3300816228,4293542123
 dimwishlist:item=906840740&perks=3300816228,557221067
+dimwishlist:item=906840740&perks=1820235745,4293542123
 dimwishlist:item=906840740&perks=1820235745,557221067
 
 // 忠于职守 [3489054606] (pve)
@@ -7353,7 +7390,9 @@ dimwishlist:item=3489054606&perks=4293542123,3078487919
 
 // 忠于职守 [3624844116] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=3624844116&perks=3300816228,4293542123
 dimwishlist:item=3624844116&perks=3300816228,557221067
+dimwishlist:item=3624844116&perks=1820235745,4293542123
 dimwishlist:item=3624844116&perks=1820235745,557221067
 
 // 忠于职守 [906840740] (pvp) [兼容子集]
@@ -7968,6 +8007,7 @@ dimwishlist:item=1453235079&perks=3700496672,3824105627
 
 // 绞刑判官SR4 [3832743906] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=3832743906&perks=3700496672,3891536761
 dimwishlist:item=3832743906&perks=3700496672,3824105627
 
 // 绞刑判官SR4 [4281371574] (pve) [兼容子集]
@@ -8293,6 +8333,7 @@ dimwishlist:item=3465233192&perks=201365942
 
 // 扎乌利的克星 [431721920] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=431721920&perks=3038247973,3824105627
 dimwishlist:item=431721920&perks=3038247973,4293542123
 dimwishlist:item=431721920&perks=3038247973,3640170453
 dimwishlist:item=431721920&perks=3038247973,657025441
@@ -8462,11 +8503,6 @@ dimwishlist:item=1802315656&perks=3182497402,3640170453
 dimwishlist:item=1802315656&perks=3182497402,1134488199
 dimwishlist:item=1802315656&perks=3182497402,776531651
 
-// 鲁莽神谕 [1992309064] (pve) [兼容子集]
-//notes: tags:pve
-dimwishlist:item=1992309064&perks=2048641572,776531651
-dimwishlist:item=1992309064&perks=3182497402,776531651
-
 // 鲁莽神谕 [4158265643] (pve)
 //notes: tags:pve
 dimwishlist:item=4158265643&perks=2048641572,3640170453
@@ -8483,15 +8519,6 @@ dimwishlist:item=4158265643&perks=3182497402,776531651
 //notes: tags:pvp
 dimwishlist:item=1802315656&perks=3619207468,1015611457
 dimwishlist:item=1802315656&perks=3619207468,3215448563
-
-// 鲁莽神谕 [1992309064] (pvp)
-//notes: tags:pvp
-dimwishlist:item=1992309064&perks=3619207468,1015611457
-dimwishlist:item=1992309064&perks=3619207468,3215448563
-
-// 鲁莽神谕 [3385326721] (pvp) [兼容子集]
-//notes: tags:pvp
-dimwishlist:item=3385326721&perks=1015611457
 
 // 鲁莽神谕 [4158265643] (pvp)
 //notes: tags:pvp
@@ -8593,6 +8620,8 @@ dimwishlist:item=1917334929&perks=2039302152,591790007
 
 // 有限冲击器 [3813153080] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=3813153080&perks=2039302152,11551321
+dimwishlist:item=3813153080&perks=2039302152,3511092054
 dimwishlist:item=3813153080&perks=2039302152,591790007
 
 // 孤独如神 [353884603] (pve)
@@ -8713,31 +8742,37 @@ dimwishlist:item=293709640&perks=1645158859,699525795
 dimwishlist:item=1084190509&perks=2213355989
 dimwishlist:item=1084190509&perks=699525795
 
-// 威胁等级 [950894542] (pve) [兼容子集]
+// 威胁等级 [950894542] (pve)
 //notes: tags:pve
+dimwishlist:item=950894542&perks=3751912585,3640170453
 dimwishlist:item=950894542&perks=3751912585,2360754333
 dimwishlist:item=950894542&perks=3751912585,3078487919
 dimwishlist:item=950894542&perks=3751912585,1089671869
 dimwishlist:item=950894542&perks=3751912585,1226351311
+dimwishlist:item=950894542&perks=1631667848,3640170453
 dimwishlist:item=950894542&perks=1631667848,2360754333
 dimwishlist:item=950894542&perks=1631667848,3078487919
 dimwishlist:item=950894542&perks=1631667848,1089671869
 dimwishlist:item=950894542&perks=1631667848,1226351311
+dimwishlist:item=950894542&perks=2679249093,3640170453
 dimwishlist:item=950894542&perks=2679249093,2360754333
 dimwishlist:item=950894542&perks=2679249093,3078487919
 dimwishlist:item=950894542&perks=2679249093,1089671869
 dimwishlist:item=950894542&perks=2679249093,1226351311
 
-// 威胁等级 [1523151869] (pve) [兼容子集]
+// 威胁等级 [1523151869] (pve)
 //notes: tags:pve
+dimwishlist:item=1523151869&perks=3751912585,3640170453
 dimwishlist:item=1523151869&perks=3751912585,2360754333
 dimwishlist:item=1523151869&perks=3751912585,3078487919
 dimwishlist:item=1523151869&perks=3751912585,1089671869
 dimwishlist:item=1523151869&perks=3751912585,1226351311
+dimwishlist:item=1523151869&perks=1631667848,3640170453
 dimwishlist:item=1523151869&perks=1631667848,2360754333
 dimwishlist:item=1523151869&perks=1631667848,3078487919
 dimwishlist:item=1523151869&perks=1631667848,1089671869
 dimwishlist:item=1523151869&perks=1631667848,1226351311
+dimwishlist:item=1523151869&perks=2679249093,3640170453
 dimwishlist:item=1523151869&perks=2679249093,2360754333
 dimwishlist:item=1523151869&perks=2679249093,3078487919
 dimwishlist:item=1523151869&perks=2679249093,1089671869
@@ -8924,32 +8959,39 @@ dimwishlist:item=218335759&perks=3300816228
 
 // 边缘交通 [568611923] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=568611923&perks=3300816228,3993379141
 dimwishlist:item=568611923&perks=3300816228,3078487919
 dimwishlist:item=568611923&perks=3300816228,2888557110
 dimwishlist:item=568611923&perks=3300816228,3194351027
+dimwishlist:item=568611923&perks=3751912585,3993379141
 dimwishlist:item=568611923&perks=3751912585,3078487919
 dimwishlist:item=568611923&perks=3751912585,2888557110
 dimwishlist:item=568611923&perks=3751912585,3194351027
 
 // 边缘交通 [2228325504] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=2228325504&perks=3300816228,3993379141
 dimwishlist:item=2228325504&perks=3300816228,3078487919
 dimwishlist:item=2228325504&perks=3300816228,2888557110
 dimwishlist:item=2228325504&perks=3300816228,3194351027
+dimwishlist:item=2228325504&perks=3751912585,3993379141
 dimwishlist:item=2228325504&perks=3751912585,3078487919
 dimwishlist:item=2228325504&perks=3751912585,2888557110
 dimwishlist:item=2228325504&perks=3751912585,3194351027
 
-// 边缘交通 [3736001863] (pve) [兼容子集]
+// 边缘交通 [3736001863] (pve)
 //notes: tags:pve
+dimwishlist:item=3736001863&perks=3987942396,3993379141
 dimwishlist:item=3736001863&perks=3987942396,3078487919
 dimwishlist:item=3736001863&perks=3987942396,2888557110
 dimwishlist:item=3736001863&perks=3987942396,3194351027
 dimwishlist:item=3736001863&perks=3987942396,1089671869
+dimwishlist:item=3736001863&perks=3300816228,3993379141
 dimwishlist:item=3736001863&perks=3300816228,3078487919
 dimwishlist:item=3736001863&perks=3300816228,2888557110
 dimwishlist:item=3736001863&perks=3300816228,3194351027
 dimwishlist:item=3736001863&perks=3300816228,1089671869
+dimwishlist:item=3736001863&perks=3751912585,3993379141
 dimwishlist:item=3736001863&perks=3751912585,3078487919
 dimwishlist:item=3736001863&perks=3751912585,2888557110
 dimwishlist:item=3736001863&perks=3751912585,3194351027
@@ -8996,6 +9038,7 @@ dimwishlist:item=2961807684&perks=1600092898
 
 // 环形逻辑 [2187717691] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=2187717691&perks=3523296417
 dimwishlist:item=2187717691&perks=831391274
 
 // 环形逻辑 [2528793321] (pve)
@@ -9161,7 +9204,7 @@ dimwishlist:item=3851394887&perks=47981717,555281244
 dimwishlist:item=3851394887&perks=47981717,699525795
 dimwishlist:item=3851394887&perks=47981717,2720533289
 
-// 永久冻土 [2316331767] (pve) [兼容子集]
+// 永久冻土 [2316331767] (pve)
 //notes: tags:pve
 dimwishlist:item=2316331767&perks=1556840489,2922950962
 dimwishlist:item=2316331767&perks=1556840489,3592538738
@@ -9175,8 +9218,11 @@ dimwishlist:item=2316331767&perks=1017229899,691659142
 dimwishlist:item=2316331767&perks=2360347339,2922950962
 dimwishlist:item=2316331767&perks=2360347339,3592538738
 dimwishlist:item=2316331767&perks=2360347339,691659142
+dimwishlist:item=2316331767&perks=1955165503,2922950962
+dimwishlist:item=2316331767&perks=1955165503,3592538738
+dimwishlist:item=2316331767&perks=1955165503,691659142
 
-// 永久冻土 [2922964484] (pve) [兼容子集]
+// 永久冻土 [2922964484] (pve)
 //notes: tags:pve
 dimwishlist:item=2922964484&perks=1556840489,2922950962
 dimwishlist:item=2922964484&perks=1556840489,3592538738
@@ -9190,6 +9236,9 @@ dimwishlist:item=2922964484&perks=1017229899,691659142
 dimwishlist:item=2922964484&perks=2360347339,2922950962
 dimwishlist:item=2922964484&perks=2360347339,3592538738
 dimwishlist:item=2922964484&perks=2360347339,691659142
+dimwishlist:item=2922964484&perks=1955165503,2922950962
+dimwishlist:item=2922964484&perks=1955165503,3592538738
+dimwishlist:item=2922964484&perks=1955165503,691659142
 
 // 未竟之终 [852551895] (pve) [兼容子集]
 //notes: tags:pve
@@ -9328,6 +9377,7 @@ dimwishlist:item=601948197&perks=1955165503,3708227201
 
 // 和风 [1911078836] (pve) [兼容子集]
 //notes: tags:pve
+dimwishlist:item=1911078836&perks=1749209109,243981275
 dimwishlist:item=1911078836&perks=1749209109,3650930298
 dimwishlist:item=1911078836&perks=1749209109,3913600130
 dimwishlist:item=1911078836&perks=1749209109,3708227201
@@ -9553,7 +9603,7 @@ dimwishlist:item=3166250992&perks=2846385770,591790007
 dimwishlist:item=3166250992&perks=2846385770,699525795
 dimwishlist:item=3166250992&perks=2846385770,2458213969
 
-// 宣召呼唤 [3947966653] (pve) [兼容子集]
+// 宣召呼唤 [3947966653] (pve)
 //notes: tags:pve
 dimwishlist:item=3947966653&perks=1523832109,3640170453
 dimwishlist:item=3947966653&perks=1523832109,831391274
@@ -9563,6 +9613,8 @@ dimwishlist:item=3947966653&perks=3523296417,3640170453
 dimwishlist:item=3947966653&perks=3523296417,831391274
 dimwishlist:item=3947966653&perks=880644845,3640170453
 dimwishlist:item=3947966653&perks=880644845,831391274
+dimwishlist:item=3947966653&perks=923806249,3640170453
+dimwishlist:item=3947966653&perks=923806249,831391274
 
 // 三冠得主 [1605599021] (pve)
 //notes: tags:pve
@@ -9672,6 +9724,7 @@ dimwishlist:item=4148460558&perks=3828510309,831391274
 
 // 幽灵骏马 [1389546626] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=1389546626&perks=2387244414,3619207468
 dimwishlist:item=1389546626&perks=2387244414,1015611457
 dimwishlist:item=1389546626&perks=2387244414,3038247973
 
@@ -9693,6 +9746,8 @@ dimwishlist:item=3007479950&perks=3619207468,1015611457
 dimwishlist:item=3007479950&perks=3619207468,3038247973
 dimwishlist:item=3007479950&perks=2387244414,1015611457
 dimwishlist:item=3007479950&perks=2387244414,3038247973
+dimwishlist:item=3007479950&perks=699525795,1015611457
+dimwishlist:item=3007479950&perks=699525795,3038247973
 
 // 幽灵骏马 [4148460558] (pvp)
 //notes: tags:pvp
@@ -9978,7 +10033,7 @@ dimwishlist:item=3634548598&perks=588594999,460017080
 dimwishlist:item=3634548598&perks=588594999,1015611457
 dimwishlist:item=3634548598&perks=588594999,591790007
 
-// 专业记忆 [3605603507] (pve) [兼容子集]
+// 专业记忆 [3605603507] (pve)
 //notes: tags:pve
 dimwishlist:item=3605603507&perks=1523832109,3078487919
 dimwishlist:item=3605603507&perks=1523832109,365154968
@@ -9988,6 +10043,8 @@ dimwishlist:item=3605603507&perks=880644845,3078487919
 dimwishlist:item=3605603507&perks=880644845,365154968
 dimwishlist:item=3605603507&perks=960997401,3078487919
 dimwishlist:item=3605603507&perks=960997401,365154968
+dimwishlist:item=3605603507&perks=831391274,3078487919
+dimwishlist:item=3605603507&perks=831391274,365154968
 
 // 信标 [76739872] (pve)
 //notes: tags:pve
@@ -10381,6 +10438,7 @@ dimwishlist:item=2631356658&perks=460017080,3047969693
 
 // 高炉 [3843477312] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=3843477312&perks=2387244414,460017080
 dimwishlist:item=3843477312&perks=2387244414,1015611457
 
 // 故人往事 [767170345] (pve)
@@ -10490,6 +10548,7 @@ dimwishlist:item=810474119&perks=3161816588,3038247973
 
 // 备用口粮 [3116356268] (pvp) [兼容子集]
 //notes: tags:pvp
+dimwishlist:item=3116356268&perks=3161816588
 dimwishlist:item=3116356268&perks=3038247973
 
 // 备用口粮 [3236112986] (pvp) [兼容子集]
@@ -10590,10 +10649,13 @@ dimwishlist:item=3638723317&perks=47981717,3414324643
 dimwishlist:item=3638723317&perks=201365942,3414324643
 dimwishlist:item=3638723317&perks=2652708987,3414324643
 
-// 噤声 [3962575203] (pvp) [兼容子集]
+// 噤声 [3962575203] (pvp)
 //notes: tags:pvp
+dimwishlist:item=3962575203&perks=1866048759,2652708987
 dimwishlist:item=3962575203&perks=1866048759,3414324643
+dimwishlist:item=3962575203&perks=47981717,2652708987
 dimwishlist:item=3962575203&perks=47981717,3414324643
+dimwishlist:item=3962575203&perks=201365942,2652708987
 dimwishlist:item=3962575203&perks=201365942,3414324643
 
 // 无感 [1271275406] (pve)
@@ -10686,7 +10748,7 @@ dimwishlist:item=2850664015&perks=2848615171
 
 // 信任 [4077196130] (pve) [兼容子集]
 //notes: tags:pve
-dimwishlist:item=4077196130&perks=3038247973
+dimwishlist:item=4077196130&perks=2848615171,3038247973
 
 // 信任 [810474118] (pvp)
 //notes: tags:pvp

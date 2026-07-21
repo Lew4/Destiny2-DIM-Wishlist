@@ -42,6 +42,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--description", default=defaults.wishlist_description, help="Wishlist 描述"
     )
+    parser.add_argument(
+        "--diagnostics", action="store_true",
+        help="额外保留CSV审计报告；默认outputs中只保留最终Wishlist",
+    )
     return parser
 
 
@@ -58,6 +62,7 @@ def config_from_args(argv: Optional[Sequence[str]] = None) -> BuilderConfig:
         version_perk_policy=args.version_perk_policy,
         wishlist_title=args.title,
         wishlist_description=args.description,
+        write_diagnostics=args.diagnostics,
     )
 
 
@@ -67,6 +72,18 @@ def run(config: BuilderConfig) -> int:
     output_dir = config.output_dir.expanduser().resolve()
     cache_dir = config.cache_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not config.write_diagnostics:
+        for filename in (
+            config.unresolved_filename,
+            config.extracted_filename,
+            config.resolved_audit_filename,
+            config.weapon_candidates_filename,
+            config.perk_candidates_filename,
+        ):
+            path = output_dir / filename
+            if path.is_file():
+                path.unlink()
 
     print("[CONFIG]")
     print(f"      input: {input_path}")
@@ -94,12 +111,13 @@ def run(config: BuilderConfig) -> int:
     expanded = expand_rows(rows, weapon_col, perk_cols, note_col, tier_col, rank_col)
     print(f"      展开后 roll 组合: {len(expanded)}")
 
-    extracted_path = output_dir / config.extracted_filename
-    weapon_candidates_path = output_dir / config.weapon_candidates_filename
-    perk_candidates_path = output_dir / config.perk_candidates_filename
-    write_extracted_report(extracted_path, expanded)
-    write_weapon_candidate_report(weapon_candidates_path, config, index, expanded)
-    write_perk_candidate_report(perk_candidates_path, config, index, expanded)
+    if config.write_diagnostics:
+        extracted_path = output_dir / config.extracted_filename
+        weapon_candidates_path = output_dir / config.weapon_candidates_filename
+        perk_candidates_path = output_dir / config.perk_candidates_filename
+        write_extracted_report(extracted_path, expanded)
+        write_weapon_candidate_report(weapon_candidates_path, config, index, expanded)
+        write_perk_candidate_report(perk_candidates_path, config, index, expanded)
 
     print("[4/5] 匹配 hash 并生成 DIM wishlist ...")
     lines, unresolved, audit = build_wishlist(config, index, expanded)
