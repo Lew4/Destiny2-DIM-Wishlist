@@ -12,7 +12,6 @@ outputs/extracted_icons/
 outputs/unresolved_icons/
 outputs/.official_icon_cache/
 
-# Local source copy and macOS metadata are not part of the merged project.
-dim_wishlist_dual_builder/
+# macOS metadata is not part of the project.
 .DS_Store
 ._*
