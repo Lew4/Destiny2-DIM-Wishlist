@@ -33,18 +33,12 @@ class IconContext:
     source_col: int
     source_cell: str
     special_note: str
+    recommendation_note: str
     media_path: str
     icon_sha256: str
     icon_extension: str
     icon_bytes: bytes
     exported_icon: str
-
-
-@dataclass(frozen=True)
-class IconLegendNote:
-    usage: str
-    note: str
-    icon_sha256: str
 
 
 @dataclass

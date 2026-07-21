@@ -15,12 +15,11 @@ from dim_wishlist.icon_reports import (
 )
 from dim_wishlist.icon_wishlist import (
     is_recommendation_excluded,
-    notes_for_combination,
     render_wishlist_from_audit,
     resolve_global_visual_in_actual_trait_socket,
     resolve_named_perk_in_weapon_socket,
 )
-from dim_wishlist.icon_xlsx import extract_icon_contexts, extract_icon_legend_notes
+from dim_wishlist.icon_xlsx import extract_icon_contexts
 from dim_wishlist.manifest import ManifestIndex
 from dim_wishlist.models import InventoryItem
 
@@ -79,23 +78,9 @@ class IconWorkflowTests(unittest.TestCase):
         self.assertEqual(stats["unique_perk_icon_count"], 184)
         self.assertEqual(stats["missing_weapon_count"], 0)
         self.assertEqual(contexts[0].source_cell, "X6")
-
-        notes = extract_icon_legend_notes(workbook)
-        self.assertEqual(len(notes), 143)
-        self.assertEqual({note.usage for note in notes}, {"pve", "pvp"})
-
-    def test_combination_notes_follow_selected_perk_visuals(self):
-        perk = InventoryItem(
-            hash=601, sql_id=601, name="测试特性", item_type=19,
-            item_type_display="特性", item_type_and_tier_display="普通 特性",
-            tier_type_name="普通", plug_category_identifier="frames",
-            has_plug=True, json_obj={"hash": 601},
-        )
-        notes = notes_for_combination(
-            "pve", [perk], {601: "visual"},
-            {("pve", "visual"): ["第一条说明", "第二条说明"]},
-        )
-        self.assertEqual(notes, ["第一条说明", "第二条说明"])
+        self.assertEqual(contexts[0].recommendation_note, "小于刚玉战锤")
+        first_pvp = next(context for context in contexts if context.source_cell == "AG6")
+        self.assertIn("标准手炮池子", first_pvp.recommendation_note)
 
     def test_duplicate_rolls_merge_pve_and_pvp_notes(self):
         base = {
@@ -104,8 +89,8 @@ class IconWorkflowTests(unittest.TestCase):
             "partial": "no",
         }
         lines = render_wishlist_from_audit([
-            {**base, "usage": "pve", "_notes": ["PVE说明"]},
-            {**base, "usage": "pvp", "_notes": ["PVP说明"]},
+            {**base, "usage": "pve", "_usage_note": "PVE说明"},
+            {**base, "usage": "pvp", "_usage_note": "PVP说明"},
         ])
         self.assertEqual(sum(line.startswith("dimwishlist:") for line in lines), 1)
         note_line = next(line for line in lines if line.startswith("//notes:"))
@@ -117,7 +102,7 @@ class IconWorkflowTests(unittest.TestCase):
         base = {
             "weapon_hash": 901, "weapon_name": "测试枪",
             "manifest_weapon_name": "测试枪", "usage": "pve",
-            "partial": "no", "_notes": [],
+            "partial": "no", "_usage_note": "整把武器的PVE说明",
         }
         lines = render_wishlist_from_audit([
             {**base, "wishlist_perks": "1001,1002"},
@@ -126,6 +111,7 @@ class IconWorkflowTests(unittest.TestCase):
         headings = [line for line in lines if line.startswith("// 测试枪")]
         self.assertEqual(headings, ["// 测试枪 [901] (pve)"])
         self.assertEqual(sum(line.startswith("dimwishlist:") for line in lines), 2)
+        self.assertEqual(sum(line.startswith("//notes:") for line in lines), 1)
 
     def test_similarity_tolerates_small_translation(self):
         config = IconBuilderConfig()

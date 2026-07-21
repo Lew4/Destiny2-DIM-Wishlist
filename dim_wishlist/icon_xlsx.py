@@ -23,7 +23,7 @@ from .icon_config import (
     REL_WEAPON_TYPE,
     IconBuilderConfig,
 )
-from .icon_models import DrawingImage, IconContext, IconLegendNote
+from .icon_models import DrawingImage, IconContext
 from .utils import clean_text
 
 
@@ -175,31 +175,6 @@ def export_unique_icon(icon_dir: Path, image: DrawingImage) -> str:
     return filename
 
 
-def extract_icon_legend_notes(xlsx_path: Path) -> List[IconLegendNote]:
-    """Read the left-side PVE/PVP perk legend and its following-row descriptions."""
-    with zipfile.ZipFile(xlsx_path) as archive:
-        cells = read_sheet_cells(archive)
-        drawings = read_drawing_images(archive)
-
-    result = []
-    seen = set()
-    for image in drawings:
-        if 1 <= image.col <= 8:  # B:I
-            usage, note_col = "pve", 1
-        elif 10 <= image.col <= 17:  # K:R
-            usage, note_col = "pvp", 10
-        else:
-            continue
-        note = clean_text(cells.get((image.row + 1, note_col), ""))
-        key = usage, image.sha256, note
-        if note and key not in seen:
-            result.append(IconLegendNote(
-                usage=usage, note=note, icon_sha256=image.sha256,
-            ))
-            seen.add(key)
-    return result
-
-
 def extract_icon_contexts(
     xlsx_path: Path,
     output_dir: Path,
@@ -226,6 +201,7 @@ def extract_icon_contexts(
             ignored += 1
             continue
         usage, slot, slot_position = classified
+        weapon_row = image.row
         weapon_name = clean_text(cells.get((image.row, section_start), ""))
         weapon_type = clean_text(cells.get((image.row, section_start + REL_WEAPON_TYPE), ""))
         special_note = clean_text(cells.get((image.row, section_start + REL_SPECIAL), ""))
@@ -233,6 +209,7 @@ def extract_icon_contexts(
             for previous_row in range(image.row - 1, max(-1, image.row - 4), -1):
                 weapon_name = clean_text(cells.get((previous_row, section_start), ""))
                 if weapon_name:
+                    weapon_row = previous_row
                     weapon_type = weapon_type or clean_text(
                         cells.get((previous_row, section_start + REL_WEAPON_TYPE), "")
                     )
@@ -243,6 +220,12 @@ def extract_icon_contexts(
         if not weapon_name:
             missing_weapon += 1
             continue
+        note_offset = (
+            REL_PVE_TRAIT3_START if usage == "pve" else REL_PVP_TRAIT3_START
+        )
+        recommendation_note = clean_text(
+            cells.get((weapon_row + 1, section_start + note_offset), "")
+        )
         exported = (
             export_unique_icon(icon_dir, image)
             if config.write_diagnostics else f"{image.sha256[:24]}{image.extension}"
@@ -258,6 +241,7 @@ def extract_icon_contexts(
             source_col=image.col,
             source_cell=f"{zero_based_to_col_letters(image.col)}{image.row + 1}",
             special_note=special_note,
+            recommendation_note=recommendation_note,
             media_path=image.media_path,
             icon_sha256=image.sha256,
             icon_extension=image.extension,

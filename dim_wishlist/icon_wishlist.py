@@ -218,24 +218,8 @@ def is_recommendation_excluded(
     return False
 
 
-def notes_for_combination(
-    usage: str,
-    combination: Sequence[InventoryItem],
-    item_visual_map: Dict[int, str],
-    visual_notes: Dict[Tuple[str, str], Sequence[str]],
-) -> List[str]:
-    notes = []
-    for item in combination:
-        visual_id = item_visual_map.get(item.hash, "")
-        for note in visual_notes.get((usage, visual_id), []):
-            value = sanitize_comment(note)
-            if value and value not in notes:
-                notes.append(value)
-    return notes
-
-
 def render_wishlist_from_audit(audit: Sequence[Dict[str, Any]]) -> List[str]:
-    """Render unique DIM rolls while merging notes that DIM would otherwise discard."""
+    """Render unique DIM rolls with one weapon-level note block per usage."""
     unique: Dict[Tuple[int, Tuple[int, ...]], Dict[str, Any]] = {}
     for row in audit:
         weapon_hash = int(row["weapon_hash"])
@@ -249,16 +233,16 @@ def render_wishlist_from_audit(audit: Sequence[Dict[str, Any]]) -> List[str]:
             "weapon_name": row["weapon_name"],
             "manifest_weapon_name": row.get("manifest_weapon_name", row["weapon_name"]),
             "usages": [],
-            "notes": [],
+            "usage_notes": {},
             "partials": [],
         })
         usage = str(row["usage"])
         if usage not in entry["usages"]:
             entry["usages"].append(usage)
-        for note in row.get("_notes", []):
-            value = sanitize_comment(note).replace("|", "／").replace("｜", "／")
-            if value and value not in entry["notes"]:
-                entry["notes"].append(value)
+        value = sanitize_comment(row.get("_usage_note", row.get("notes", "")))
+        value = value.replace("|", "／").replace("｜", "／")
+        if value:
+            entry["usage_notes"][usage] = value
         entry["partials"].append(row.get("partial") == "yes")
 
     grouped: Dict[Tuple[str, str, int, str], List[Dict[str, Any]]] = {}
@@ -289,12 +273,22 @@ def render_wishlist_from_audit(audit: Sequence[Dict[str, Any]]) -> List[str]:
         lines.append(
             f"// {sanitize_comment(display_name)} [{weapon_hash}] ({usage}){suffix}"
         )
+        note_groups: Dict[Tuple[Tuple[str, ...], Tuple[str, ...]], List[Dict[str, Any]]] = {}
         for entry in entries:
-            note_parts = [f"tags:{','.join(entry['usages'])}"] + entry["notes"]
-            lines.append(f"//notes: {'；'.join(note_parts)}")
-            lines.append(
-                f"dimwishlist:item={entry['weapon_hash']}&perks={entry['wishlist_perks']}"
+            usages = tuple(entry["usages"])
+            notes = tuple(
+                entry["usage_notes"][entry_usage]
+                for entry_usage in usages
+                if entry_usage in entry["usage_notes"]
             )
+            note_groups.setdefault((usages, notes), []).append(entry)
+        for (usages, notes), note_entries in note_groups.items():
+            note_parts = [f"tags:{','.join(usages)}"] + list(notes)
+            lines.append(f"//notes: {'；'.join(note_parts)}")
+            for entry in note_entries:
+                lines.append(
+                    f"dimwishlist:item={entry['weapon_hash']}&perks={entry['wishlist_perks']}"
+                )
         lines.append("")
     return lines
 
@@ -307,9 +301,7 @@ def build_matches_and_wishlist(
     resolutions: Dict[str, GlobalIconResolution],
     visuals: Sequence[OfficialVisual],
     item_visual_map: Dict[int, str],
-    visual_notes: Optional[Dict[Tuple[str, str], Sequence[str]]] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str], List[Dict[str, Any]]]:
-    visual_notes = visual_notes or {}
     visual_by_id = {visual.visual_id: visual for visual in visuals}
     unresolved_dir = output_dir / config.unresolved_icon_dirname
     if config.write_diagnostics:
@@ -321,6 +313,7 @@ def build_matches_and_wishlist(
 
     for (_, excel_row, weapon_name, usage), group in group_contexts(contexts).items():
         weapon_type = group[0].weapon_type if group else ""
+        recommendation_note = group[0].recommendation_note if group else ""
         manifest_weapon_name = resolve_manifest_weapon_name(
             config, weapon_name, weapon_type
         )
@@ -517,9 +510,6 @@ def build_matches_and_wishlist(
             partial = any(row["accepted"] == "no" for row in group_match_rows)
             for combination in combinations:
                 perk_hashes = ",".join(str(item.hash) for item in combination)
-                combination_notes = notes_for_combination(
-                    usage, combination, item_visual_map, visual_notes
-                )
                 audit.append({
                     "excel_row": excel_row,
                     "weapon_name": weapon_name,
@@ -533,8 +523,8 @@ def build_matches_and_wishlist(
                     "trait_4_names": " / ".join(item.name for item in selected_by_slot["trait_4"]),
                     "trait_4_hashes": " / ".join(str(item.hash) for item in selected_by_slot["trait_4"]),
                     "wishlist_perks": perk_hashes,
-                    "notes": "；".join(combination_notes),
-                    "_notes": combination_notes,
+                    "notes": recommendation_note,
+                    "_usage_note": recommendation_note,
                     "combination_count": len(combinations),
                     "partial": "yes" if partial else "no",
                     "mapping_method": mapping_info.get("method", ""),
