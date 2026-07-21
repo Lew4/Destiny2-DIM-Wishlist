@@ -218,6 +218,73 @@ def is_recommendation_excluded(
     return False
 
 
+def notes_for_combination(
+    usage: str,
+    combination: Sequence[InventoryItem],
+    item_visual_map: Dict[int, str],
+    visual_notes: Dict[Tuple[str, str], Sequence[str]],
+) -> List[str]:
+    notes = []
+    for item in combination:
+        visual_id = item_visual_map.get(item.hash, "")
+        for note in visual_notes.get((usage, visual_id), []):
+            value = sanitize_comment(note)
+            if value and value not in notes:
+                notes.append(value)
+    return notes
+
+
+def render_wishlist_from_audit(audit: Sequence[Dict[str, Any]]) -> List[str]:
+    """Render unique DIM rolls while merging notes that DIM would otherwise discard."""
+    unique: Dict[Tuple[int, Tuple[int, ...]], Dict[str, Any]] = {}
+    for row in audit:
+        weapon_hash = int(row["weapon_hash"])
+        perk_hashes = tuple(
+            sorted({int(value) for value in str(row["wishlist_perks"]).split(",") if value})
+        )
+        key = weapon_hash, perk_hashes
+        entry = unique.setdefault(key, {
+            "weapon_hash": weapon_hash,
+            "wishlist_perks": row["wishlist_perks"],
+            "weapon_name": row["weapon_name"],
+            "manifest_weapon_name": row.get("manifest_weapon_name", row["weapon_name"]),
+            "usages": [],
+            "notes": [],
+            "partials": [],
+        })
+        usage = str(row["usage"])
+        if usage not in entry["usages"]:
+            entry["usages"].append(usage)
+        for note in row.get("_notes", []):
+            value = sanitize_comment(note).replace("|", "／").replace("｜", "／")
+            if value and value not in entry["notes"]:
+                entry["notes"].append(value)
+        entry["partials"].append(row.get("partial") == "yes")
+
+    lines = [
+        "title:Icon-based DIM Wishlist",
+        "description:Global icon recognition followed by weapon-version socket hash resolution.",
+        "",
+    ]
+    for entry in unique.values():
+        display_name = entry["weapon_name"]
+        if norm_name(entry["manifest_weapon_name"]) != norm_name(display_name):
+            display_name = f"{display_name} → {entry['manifest_weapon_name']}"
+        usage_label = "/".join(entry["usages"])
+        suffix = " [兼容子集]" if all(entry["partials"]) else ""
+        lines.append(
+            f"// {sanitize_comment(display_name)} [{entry['weapon_hash']}] "
+            f"({usage_label}){suffix}"
+        )
+        note_parts = [f"tags:{','.join(entry['usages'])}"] + entry["notes"]
+        lines.append(f"//notes: {'；'.join(note_parts)}")
+        lines.append(
+            f"dimwishlist:item={entry['weapon_hash']}&perks={entry['wishlist_perks']}"
+        )
+        lines.append("")
+    return lines
+
+
 def build_matches_and_wishlist(
     config: IconBuilderConfig,
     index: ManifestIndex,
@@ -226,7 +293,9 @@ def build_matches_and_wishlist(
     resolutions: Dict[str, GlobalIconResolution],
     visuals: Sequence[OfficialVisual],
     item_visual_map: Dict[int, str],
+    visual_notes: Optional[Dict[Tuple[str, str], Sequence[str]]] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str], List[Dict[str, Any]]]:
+    visual_notes = visual_notes or {}
     visual_by_id = {visual.visual_id: visual for visual in visuals}
     unresolved_dir = output_dir / config.unresolved_icon_dirname
     if config.write_diagnostics:
@@ -234,11 +303,7 @@ def build_matches_and_wishlist(
     matches: List[Dict[str, Any]] = []
     unresolved: List[Dict[str, Any]] = []
     audit: List[Dict[str, Any]] = []
-    wishlist_lines = [
-        "title:Icon-based DIM Wishlist",
-        "description:Global icon recognition followed by weapon-version socket hash resolution.",
-        "",
-    ]
+    wishlist_lines: List[str] = []
 
     for (_, excel_row, weapon_name, usage), group in group_contexts(contexts).items():
         weapon_type = group[0].weapon_type if group else ""
@@ -436,17 +501,11 @@ def build_matches_and_wishlist(
                     seen_hashes.add(hashes)
                     combinations.append(combination)
             partial = any(row["accepted"] == "no" for row in group_match_rows)
-            suffix = " [兼容子集]" if partial else ""
-            display_name = weapon_name
-            if norm_name(manifest_weapon_name) != norm_name(weapon_name):
-                display_name = f"{weapon_name} → {manifest_weapon_name}"
-            wishlist_lines.append(
-                f"// {sanitize_comment(display_name)} [{weapon.hash}] ({usage}){suffix}"
-            )
-            wishlist_lines.append(f"//notes: tags:{usage}")
             for combination in combinations:
                 perk_hashes = ",".join(str(item.hash) for item in combination)
-                wishlist_lines.append(f"dimwishlist:item={weapon.hash}&perks={perk_hashes}")
+                combination_notes = notes_for_combination(
+                    usage, combination, item_visual_map, visual_notes
+                )
                 audit.append({
                     "excel_row": excel_row,
                     "weapon_name": weapon_name,
@@ -460,15 +519,17 @@ def build_matches_and_wishlist(
                     "trait_4_names": " / ".join(item.name for item in selected_by_slot["trait_4"]),
                     "trait_4_hashes": " / ".join(str(item.hash) for item in selected_by_slot["trait_4"]),
                     "wishlist_perks": perk_hashes,
+                    "notes": "；".join(combination_notes),
+                    "_notes": combination_notes,
                     "combination_count": len(combinations),
                     "partial": "yes" if partial else "no",
                     "mapping_method": mapping_info.get("method", ""),
                     "mapping_hits": mapping_info.get("hits", 0),
                 })
-            wishlist_lines.append("")
             _mark_pending(
                 unresolved, weapon.hash, excel_row, usage, "yes" if combinations else "no"
             )
+    wishlist_lines = render_wishlist_from_audit(audit)
     return matches, unresolved, wishlist_lines, audit
 
 

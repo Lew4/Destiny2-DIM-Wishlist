@@ -23,7 +23,7 @@ from .icon_config import (
     REL_WEAPON_TYPE,
     IconBuilderConfig,
 )
-from .icon_models import DrawingImage, IconContext
+from .icon_models import DrawingImage, IconContext, IconLegendNote
 from .utils import clean_text
 
 
@@ -173,6 +173,31 @@ def export_unique_icon(icon_dir: Path, image: DrawingImage) -> str:
     if not path.exists():
         path.write_bytes(image.data)
     return filename
+
+
+def extract_icon_legend_notes(xlsx_path: Path) -> List[IconLegendNote]:
+    """Read the left-side PVE/PVP perk legend and its following-row descriptions."""
+    with zipfile.ZipFile(xlsx_path) as archive:
+        cells = read_sheet_cells(archive)
+        drawings = read_drawing_images(archive)
+
+    result = []
+    seen = set()
+    for image in drawings:
+        if 1 <= image.col <= 8:  # B:I
+            usage, note_col = "pve", 1
+        elif 10 <= image.col <= 17:  # K:R
+            usage, note_col = "pvp", 10
+        else:
+            continue
+        note = clean_text(cells.get((image.row + 1, note_col), ""))
+        key = usage, image.sha256, note
+        if note and key not in seen:
+            result.append(IconLegendNote(
+                usage=usage, note=note, icon_sha256=image.sha256,
+            ))
+            seen.add(key)
+    return result
 
 
 def extract_icon_contexts(

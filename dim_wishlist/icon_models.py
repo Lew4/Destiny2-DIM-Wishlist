@@ -40,6 +40,13 @@ class IconContext:
     exported_icon: str
 
 
+@dataclass(frozen=True)
+class IconLegendNote:
+    usage: str
+    note: str
+    icon_sha256: str
+
+
 @dataclass
 class ImageSignature:
     file_sha256: str

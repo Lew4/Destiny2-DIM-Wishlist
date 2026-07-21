@@ -354,7 +354,7 @@ def write_final_reports(
             "excel_row", "weapon_name", "manifest_weapon_name", "weapon_hash", "usage",
             "slot_2_names", "slot_2_hashes", "trait_3_names", "trait_3_hashes",
             "trait_4_names", "trait_4_hashes", "wishlist_perks", "combination_count",
-            "partial", "mapping_method", "mapping_hits",
+            "notes", "partial", "mapping_method", "mapping_hits",
         ])
     (output_dir / config.wishlist_filename).write_text(
         "\n".join(wishlist_lines).rstrip() + "\n", encoding="utf-8"

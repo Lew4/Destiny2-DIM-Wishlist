@@ -19,7 +19,7 @@ from .icon_reports import (
     write_weapon_report,
 )
 from .icon_wishlist import build_matches_and_wishlist
-from .icon_xlsx import extract_icon_contexts
+from .icon_xlsx import extract_icon_contexts, extract_icon_legend_notes
 from .manifest import ManifestIndex, load_inventory_items, load_plug_sets
 from .utils import csv_write, ensure_sqlite_manifest
 
@@ -101,6 +101,7 @@ def run(config: IconBuilderConfig) -> int:
                 shutil.rmtree(path)
 
     contexts, stats = extract_icon_contexts(xlsx_path, output_dir, config)
+    legend_notes = extract_icon_legend_notes(xlsx_path)
     if config.write_diagnostics:
         write_extracted_report(output_dir / config.extracted_filename, contexts)
         (output_dir / "icon_extraction_stats.json").write_text(
@@ -145,6 +146,15 @@ def run(config: IconBuilderConfig) -> int:
     print(f"[全局图标] 官方唯一视觉图标: {len(visuals)}")
 
     resolutions = resolve_global_icons(contexts, visuals, signature_cache, config)
+    visual_notes = {}
+    for entry in legend_notes:
+        resolution = resolutions.get(entry.icon_sha256)
+        if not resolution or not resolution.accepted or not resolution.best_visual_id:
+            continue
+        key = entry.usage, resolution.best_visual_id
+        visual_notes.setdefault(key, [])
+        if entry.note not in visual_notes[key]:
+            visual_notes[key].append(entry.note)
     if config.write_diagnostics:
         write_global_reports(
             output_dir,
@@ -157,7 +167,8 @@ def run(config: IconBuilderConfig) -> int:
     print(f"[全局图标] 唯一图标识别成功: {accepted_unique}/{len(resolutions)}")
 
     matches, unresolved, wishlist_lines, audit = build_matches_and_wishlist(
-        config, index, contexts, output_dir, resolutions, visuals, item_visual_map
+        config, index, contexts, output_dir, resolutions, visuals, item_visual_map,
+        visual_notes,
     )
     report_stats = write_final_reports(
         output_dir, config, matches, unresolved, wishlist_lines, audit
@@ -172,6 +183,10 @@ def run(config: IconBuilderConfig) -> int:
     print(
         f"[历史版本] 单独归档: {report_stats['historical_version_rows']} 条，"
         f"涉及 {report_stats['historical_groups']} 个已有完整版本的推荐组"
+    )
+    print(
+        f"[备注] 图例说明: {len(legend_notes)} 条，"
+        f"已映射视觉: {len(visual_notes)} 个 PVE/PVP perk"
     )
     if config.write_diagnostics:
         print(f"[输出] {output_dir / config.global_review_filename}")
