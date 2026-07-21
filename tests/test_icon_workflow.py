@@ -18,6 +18,7 @@ from dim_wishlist.icon_wishlist import (
     render_wishlist_from_audit,
     resolve_global_visual_in_actual_trait_socket,
     resolve_named_perk_in_weapon_socket,
+    select_full_canonical_audit_rows,
 )
 from dim_wishlist.icon_xlsx import extract_icon_contexts
 from dim_wishlist.manifest import ManifestIndex
@@ -82,7 +83,7 @@ class IconWorkflowTests(unittest.TestCase):
         first_pvp = next(context for context in contexts if context.source_cell == "AG6")
         self.assertIn("标准手炮池子", first_pvp.recommendation_note)
 
-    def test_duplicate_rolls_merge_pve_and_pvp_notes(self):
+    def test_duplicate_rolls_do_not_move_pvp_note_into_pve_group(self):
         base = {
             "weapon_hash": 701, "wishlist_perks": "801,802",
             "weapon_name": "测试枪", "manifest_weapon_name": "测试枪",
@@ -95,8 +96,41 @@ class IconWorkflowTests(unittest.TestCase):
         self.assertEqual(sum(line.startswith("dimwishlist:") for line in lines), 1)
         note_line = next(line for line in lines if line.startswith("//notes:"))
         self.assertIn("tags:pve,pvp", note_line)
-        self.assertIn("PVE说明；PVP说明", note_line)
+        self.assertIn("PVE说明", note_line)
+        self.assertNotIn("PVP说明", note_line)
         self.assertNotIn("|", note_line)
+
+    def test_full_historical_versions_remain_but_internal_aliases_are_omitted(self):
+        def weapon(item_hash, release, icon_hash, collectible):
+            return InventoryItem(
+                hash=item_hash, sql_id=item_hash, name="测试枪", item_type=3,
+                item_type_display="武器", item_type_and_tier_display="传说 武器",
+                tier_type_name="传说", plug_category_identifier="", has_plug=False,
+                json_obj={
+                    "hash": item_hash,
+                    "traitIds": [f"releases.v{release}.core"],
+                    "displayProperties": {"iconHash": icon_hash},
+                    "collectibleHash": collectible,
+                },
+            )
+
+        index = ManifestIndex([
+            weapon(101, 800, 101, 1001),
+            weapon(202, 970, 303, None),
+            weapon(303, 970, 303, 1003),
+        ], {})
+        base = {
+            "excel_row": 6, "weapon_name": "测试枪",
+            "manifest_weapon_name": "测试枪", "usage": "pve",
+            "wishlist_perks": "501,502", "_usage_note": "PVE说明",
+        }
+        selected = select_full_canonical_audit_rows(index, [
+            {**base, "weapon_hash": 101, "partial": "no"},
+            {**base, "weapon_hash": 202, "partial": "no"},
+            {**base, "weapon_hash": 303, "partial": "no"},
+            {**base, "weapon_hash": 404, "partial": "yes"},
+        ])
+        self.assertEqual({row["weapon_hash"] for row in selected}, {101, 303})
 
     def test_multiple_rolls_share_one_weapon_heading(self):
         base = {

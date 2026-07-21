@@ -218,6 +218,42 @@ def is_recommendation_excluded(
     return False
 
 
+def select_full_canonical_audit_rows(
+    index: ManifestIndex,
+    audit: Sequence[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Keep every canonical weapon version that fully supports a source group."""
+    grouped: Dict[Tuple[Any, str, str, str], List[Dict[str, Any]]] = defaultdict(list)
+    for row in audit:
+        grouped[
+            row.get("excel_row"), row.get("weapon_name", ""),
+            row.get("manifest_weapon_name", ""), row.get("usage", ""),
+        ].append(row)
+
+    selected = []
+    for rows in grouped.values():
+        full_hashes = {
+            int(row["weapon_hash"])
+            for row in rows if row.get("partial") != "yes"
+        }
+        if not full_hashes:
+            continue
+
+        canonical_hashes = set()
+        for weapon_hash in full_hashes:
+            item = index.by_hash.get(weapon_hash)
+            if item is None:
+                continue
+            icon_hash = (item.json_obj.get("displayProperties") or {}).get("iconHash")
+            if icon_hash in (None, weapon_hash):
+                canonical_hashes.add(weapon_hash)
+        selected_hashes = canonical_hashes or full_hashes
+        selected.extend(
+            row for row in rows if int(row["weapon_hash"]) in selected_hashes
+        )
+    return selected
+
+
 def render_wishlist_from_audit(audit: Sequence[Dict[str, Any]]) -> List[str]:
     """Render unique DIM rolls with one weapon-level note block per usage."""
     unique: Dict[Tuple[int, Tuple[int, ...]], Dict[str, Any]] = {}
@@ -276,11 +312,7 @@ def render_wishlist_from_audit(audit: Sequence[Dict[str, Any]]) -> List[str]:
         note_groups: Dict[Tuple[Tuple[str, ...], Tuple[str, ...]], List[Dict[str, Any]]] = {}
         for entry in entries:
             usages = tuple(entry["usages"])
-            notes = tuple(
-                entry["usage_notes"][entry_usage]
-                for entry_usage in usages
-                if entry_usage in entry["usage_notes"]
-            )
+            notes = tuple(filter(None, (entry["usage_notes"].get(usage, ""),)))
             note_groups.setdefault((usages, notes), []).append(entry)
         for (usages, notes), note_entries in note_groups.items():
             note_parts = [f"tags:{','.join(usages)}"] + list(notes)
@@ -533,7 +565,8 @@ def build_matches_and_wishlist(
             _mark_pending(
                 unresolved, weapon.hash, excel_row, usage, "yes" if combinations else "no"
             )
-    wishlist_lines = render_wishlist_from_audit(audit)
+    output_audit = select_full_canonical_audit_rows(index, audit)
+    wishlist_lines = render_wishlist_from_audit(output_audit)
     return matches, unresolved, wishlist_lines, audit
 
 
